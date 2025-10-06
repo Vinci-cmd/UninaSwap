@@ -89,23 +89,35 @@ public class AnnuncioDAO {
 
     // Crea un nuovo annuncio
     public boolean creaAnnuncio(Annuncio annuncio) throws SQLException {
+        // Calcola nuovo codice
+        String last = getLastCodiceAnnuncio(); // es. "A0000042"
+        String prefix = "A";
+        int nextNum = 1;
+        if (last != null && last.startsWith(prefix)) {
+            String numPart = last.substring(prefix.length()); // "0000042"
+            nextNum = Integer.parseInt(numPart) + 1;          // 43
+        }
+        String newCode = String.format(prefix + "%07d", nextNum); // "A0000043"
+        annuncio.setCodiceAnnuncio(newCode);
+
         String sql = "INSERT INTO annuncio (codiceannuncio, descrizione, categoria, tipologia, prezzo, stato, datapubblicazione, matricola) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, annuncio.getCodiceAnnuncio());
             ps.setString(2, annuncio.getDescrizione());
             ps.setString(3, annuncio.getCategoria());
             ps.setString(4, annuncio.getTipologia());
-            if (annuncio.getPrezzo() != null) {
+            if ("vendita".equalsIgnoreCase(annuncio.getTipologia())) {
                 ps.setDouble(5, annuncio.getPrezzo());
             } else {
-                ps.setNull(5, Types.NUMERIC);
+                ps.setNull(5, java.sql.Types.DOUBLE);
             }
             ps.setString(6, annuncio.getStato());
-            ps.setDate(7, annuncio.getDataPubblicazione());
+            ps.setDate(7, new java.sql.Date(annuncio.getDataPubblicazione().getTime()));
             ps.setString(8, annuncio.getMatricola());
             return ps.executeUpdate() == 1;
         }
     }
+
 
     // Aggiorna un annuncio esistente
     public boolean aggiornaAnnuncio(Annuncio annuncio) throws SQLException {
@@ -166,4 +178,32 @@ public int getTotaleAnnunci() throws SQLException {
     }
     return 0;
 }
+public boolean modificaAnnuncio(Annuncio annuncio) throws SQLException {
+    String sql = "UPDATE annuncio SET descrizione = ?, categoria = ?, tipologia = ?, prezzo = ?, stato = ? WHERE codiceannuncio = ?";
+    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setString(1, annuncio.getDescrizione());
+        ps.setString(2, annuncio.getCategoria());
+        ps.setString(3, annuncio.getTipologia());
+        if ("vendita".equalsIgnoreCase(annuncio.getTipologia())) {
+            ps.setDouble(4, annuncio.getPrezzo());
+        } else {
+            ps.setNull(4, java.sql.Types.DOUBLE);
+        }
+        ps.setString(5, annuncio.getStato());
+        ps.setString(6, annuncio.getCodiceAnnuncio());
+        return ps.executeUpdate() == 1;
+    }
+}
+public String getLastCodiceAnnuncio() throws SQLException {
+    // Recupera solo i codici che iniziano con “A”
+    String sql = "SELECT MAX(codiceannuncio) AS maxcode FROM annuncio WHERE codiceannuncio LIKE 'A%'";
+    try (PreparedStatement ps = conn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+        if (rs.next()) {
+            return rs.getString("maxcode"); // potrebbe essere null se nessun codice A%
+        }
+    }
+    return null;
+}
+
 }

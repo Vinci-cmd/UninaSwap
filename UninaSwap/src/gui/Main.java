@@ -1,4 +1,3 @@
-// Main.java
 package gui;
 
 import Controller.Controller;
@@ -12,23 +11,14 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 public class Main extends Application {
-    private Service service;
-    private Controller controller;
-
     @Override
     public void start(Stage primaryStage) {
         try {
             Connection conn = DatabaseConnection.getConnection();
-            service = new Service(conn);
-            controller = new Controller(service);
+            Service service = new Service(conn);
+            Controller controller = new Controller(service);
 
-            LoginView loginView = new LoginView(controller, success -> {
-                if (success) {
-                    DashboardView dashboardView = new DashboardView(controller);
-                    primaryStage.getScene().setRoot(dashboardView.getRoot());
-                }
-            });
-
+            LoginView loginView = new LoginView(controller);
             Scene scene = new Scene(loginView.getRoot(), 400, 300);
             primaryStage.setScene(scene);
             primaryStage.setTitle("UninaSwap - Login");

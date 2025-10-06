@@ -1,12 +1,13 @@
-// LoginView.java
 package gui;
 
 import Controller.Controller;
 import javafx.geometry.Insets;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
-import java.util.function.Consumer;
+import java.sql.SQLException;
 
 public class LoginView {
     private VBox root;
@@ -15,11 +16,9 @@ public class LoginView {
     private Button loginButton;
     private Label messageLabel;
     private Controller controller;
-    private Consumer<Boolean> onLoginSuccess;
 
-    public LoginView(Controller controller, Consumer<Boolean> onLoginSuccess) {
+    public LoginView(Controller controller) {
         this.controller = controller;
-        this.onLoginSuccess = onLoginSuccess;
         createUI();
     }
 
@@ -48,11 +47,15 @@ public class LoginView {
         boolean success = controller.login(email, password);
         if (success) {
             messageLabel.setText("");
-            onLoginSuccess.accept(true);
+            HomePageView homepage = new HomePageView(controller);
+            Stage stage = (Stage) root.getScene().getWindow();
+            stage.setScene(new Scene(homepage.getRoot(), 900, 600));
+            stage.setTitle("UninaSwap - Dashboard");
         } else {
             messageLabel.setText("Email o password errati");
         }
     }
+
 
     public VBox getRoot() {
         return root;

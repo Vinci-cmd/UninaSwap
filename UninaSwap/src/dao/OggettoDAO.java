@@ -63,6 +63,26 @@ public class OggettoDAO {
         }
         return oggetti;
     }
+    
+    // RECUPERA TUTTI GLI OGGETTI DI UNA AMTRICOLA
+    public List<Oggetto> getOggettiByMatricola(String matricola) throws SQLException {
+        String sql = "SELECT * FROM oggetto WHERE matricola = ?";
+        List<Oggetto> oggetti = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, matricola);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                oggetti.add(new Oggetto(
+                    rs.getString("codiceoggetto"),
+                    rs.getString("nome"),
+                    rs.getString("descrizione"),
+                    rs.getString("categoria"),
+                    rs.getString("codiceannuncio")
+                ));
+            }
+        }
+        return oggetti;
+    }
 
     // AGGIORNA OGGETTO
     public boolean aggiornaOggetto(Oggetto oggetto) throws SQLException {
