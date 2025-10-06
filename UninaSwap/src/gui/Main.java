@@ -1,41 +1,41 @@
+// Main.java
 package gui;
 
+import Controller.Controller;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import service.Service;
 import utils.DatabaseConnection;
-import model.Utente;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 
 public class Main extends Application {
-
     private Service service;
+    private Controller controller;
 
     @Override
     public void start(Stage primaryStage) {
         try {
-            // 1. Apri connessione al database
             Connection conn = DatabaseConnection.getConnection();
             service = new Service(conn);
+            controller = new Controller(service);
 
-            // 2. Crea LoginView e passagli il Service + callback per Dashboard
-            LoginView loginView = new LoginView(service, utente -> {
-                DashboardView dashboardView = new DashboardView(utente, service);
-                primaryStage.getScene().setRoot(dashboardView.getRoot());
+            LoginView loginView = new LoginView(controller, success -> {
+                if (success) {
+                    DashboardView dashboardView = new DashboardView(controller);
+                    primaryStage.getScene().setRoot(dashboardView.getRoot());
+                }
             });
 
-            // 3. Imposta la scena con LoginView
             Scene scene = new Scene(loginView.getRoot(), 400, 300);
             primaryStage.setScene(scene);
-            primaryStage.setTitle("UninaSwap");
+            primaryStage.setTitle("UninaSwap - Login");
             primaryStage.show();
-
         } catch (SQLException e) {
             e.printStackTrace();
-            System.err.println("Errore connessione al database. Controlla credenziali e URL.");
+            System.err.println("Errore connessione al database.");
         }
     }
 

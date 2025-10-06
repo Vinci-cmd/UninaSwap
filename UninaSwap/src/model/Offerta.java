@@ -1,82 +1,98 @@
 package model;
 
-import java.util.Date;
+import java.sql.Date;
 
 public class Offerta {
     private String codiceOfferta;
-    private Date dataOfferta;
-    private String stato; // inviata, accettata, rifiutata, annullata
+    private String codiceAnnuncio;
+    private String matricola;
+    private String tipo;
     private Double prezzoOfferto;
-    private String tipo; // vendita, scambio, regalo
-    private String matricola; // riferimento Utente
-    private String codiceAnnuncio; // riferimento Annuncio
+    private String stato;
+    private Date dataOfferta;
 
-    public Offerta(String codiceOfferta, Date dataOfferta, String stato, Double prezzoOfferto, String tipo,
-                   String matricola, String codiceAnnuncio) {
+    // Costruttore completo
+    public Offerta(String codiceOfferta, String codiceAnnuncio, String matricola, String tipo, 
+                   Double prezzoOfferto, String stato, Date dataOfferta) {
         this.codiceOfferta = codiceOfferta;
-        this.dataOfferta = dataOfferta;
-        this.stato = stato;
-        this.prezzoOfferto = prezzoOfferto;
-        this.tipo = tipo;
+        this.codiceAnnuncio = codiceAnnuncio;
         this.matricola = matricola;
+        this.tipo = tipo;
+        this.prezzoOfferto = prezzoOfferto;
+        this.stato = stato;
+        this.dataOfferta = dataOfferta;
+    }
+
+    // Costruttore vuoto
+    public Offerta() {}
+
+    // Getters e Setters
+    public String getCodiceOfferta() {
+        return codiceOfferta;
+    }
+
+    public void setCodiceOfferta(String codiceOfferta) {
+        this.codiceOfferta = codiceOfferta;
+    }
+
+    public String getCodiceAnnuncio() {
+        return codiceAnnuncio;
+    }
+
+    public void setCodiceAnnuncio(String codiceAnnuncio) {
         this.codiceAnnuncio = codiceAnnuncio;
     }
 
-	public String getCodiceOfferta() {
-		return codiceOfferta;
-	}
+    public String getMatricola() {
+        return matricola;
+    }
 
-	public void setCodiceOfferta(String codiceOfferta) {
-		this.codiceOfferta = codiceOfferta;
-	}
+    public void setMatricola(String matricola) {
+        this.matricola = matricola;
+    }
 
-	public Date getDataOfferta() {
-		return dataOfferta;
-	}
+    public String getTipo() {
+        return tipo;
+    }
 
-	public void setDataOfferta(Date dataOfferta) {
-		this.dataOfferta = dataOfferta;
-	}
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
 
-	public String getStato() {
-		return stato;
-	}
+    public Double getPrezzoOfferto() {
+        return prezzoOfferto;
+    }
 
-	public void setStato(String stato) {
-		this.stato = stato;
-	}
+    public void setPrezzoOfferto(Double prezzoOfferto) {
+        this.prezzoOfferto = prezzoOfferto;
+    }
 
-	public Double getPrezzoOfferto() {
-		return prezzoOfferto;
-	}
+    public String getStato() {
+        return stato;
+    }
 
-	public void setPrezzoOfferto(Double prezzoOfferto) {
-		this.prezzoOfferto = prezzoOfferto;
-	}
+    public void setStato(String stato) {
+        this.stato = stato;
+    }
 
-	public String getTipo() {
-		return tipo;
-	}
+    public Date getDataOfferta() {
+        return dataOfferta;
+    }
 
-	public void setTipo(String tipo) {
-		this.tipo = tipo;
-	}
+    public void setDataOfferta(Date dataOfferta) {
+        this.dataOfferta = dataOfferta;
+    }
 
-	public String getMatricola() {
-		return matricola;
-	}
-
-	public void setMatricola(String matricola) {
-		this.matricola = matricola;
-	}
-
-	public String getCodiceAnnuncio() {
-		return codiceAnnuncio;
-	}
-
-	public void setCodiceAnnuncio(String codiceAnnuncio) {
-		this.codiceAnnuncio = codiceAnnuncio;
-	}
-
-
+    @Override
+    public String toString() {
+        return "Offerta{" +
+                "codiceOfferta='" + codiceOfferta + '\'' +
+                ", codiceAnnuncio='" + codiceAnnuncio + '\'' +
+                ", matricola='" + matricola + '\'' +
+                ", tipo='" + tipo + '\'' +
+                ", prezzoOfferto=" + prezzoOfferto +
+                ", stato='" + stato + '\'' +
+                ", dataOfferta=" + dataOfferta +
+                '}';
+    }
 }

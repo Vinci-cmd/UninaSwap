@@ -224,4 +224,19 @@ public class Service {
         offerta.setStato("rifiutata");
         return offertaDAO.aggiornaOfferta(offerta);
     }
-}
+    
+    public boolean inviaOfferta(Offerta offerta) throws SQLException {
+        return offertaDAO.inviaOfferta(offerta);
+    }
+
+    // Invia un'offerta con oggetti (per scambi)
+    public boolean inviaOffertaConOggetti(Offerta offerta, List<String> codiciOggetti) throws SQLException {
+        return offertaDAO.inviaOffertaConOggetti(offerta, codiciOggetti);
+    }
+
+    // Ottiene offerte ricevute da un utente sui suoi annunci
+    public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
+        return offertaDAO.getOfferteRicevuteByUtente(matricola);
+    }
+  }
+

@@ -16,7 +16,7 @@ public class OffertaDAO {
         String sql = "INSERT INTO offerta (codiceofferta, dataofferta, stato, prezzoofferto, tipo, matricola, codiceannuncio) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, offerta.getCodiceOfferta());
-            ps.setDate(2, new java.sql.Date(offerta.getDataOfferta().getTime())); // conversione java.util.Date -> java.sql.Date
+            ps.setDate(2, offerta.getDataOfferta());
             ps.setString(3, offerta.getStato());
             if (offerta.getPrezzoOfferto() != null) {
                 ps.setDouble(4, offerta.getPrezzoOfferto());
@@ -62,14 +62,19 @@ public class OffertaDAO {
             ps.setString(1, matricola);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
+                Double prezzoOfferto = null;
+                Object prezzoObj = rs.getObject("prezzoofferto");
+                if (prezzoObj != null) {
+                    prezzoOfferto = rs.getDouble("prezzoofferto");
+                }
                 list.add(new Offerta(
                     rs.getString("codiceofferta"),
-                    rs.getDate("dataofferta"),
-                    rs.getString("stato"),
-                    rs.getDouble("prezzoofferto"),
-                    rs.getString("tipo"),
+                    rs.getString("codiceannuncio"),
                     rs.getString("matricola"),
-                    rs.getString("codiceannuncio")
+                    rs.getString("tipo"),
+                    prezzoOfferto,
+                    rs.getString("stato"),
+                    rs.getDate("dataofferta")
                 ));
             }
         }
@@ -83,14 +88,19 @@ public class OffertaDAO {
             ps.setString(1, codiceAnnuncio);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
+                Double prezzoOfferto = null;
+                Object prezzoObj = rs.getObject("prezzoofferto");
+                if (prezzoObj != null) {
+                    prezzoOfferto = rs.getDouble("prezzoofferto");
+                }
                 list.add(new Offerta(
                     rs.getString("codiceofferta"),
-                    rs.getDate("dataofferta"),
-                    rs.getString("stato"),
-                    rs.getDouble("prezzoofferto"),
-                    rs.getString("tipo"),
+                    rs.getString("codiceannuncio"),
                     rs.getString("matricola"),
-                    rs.getString("codiceannuncio")
+                    rs.getString("tipo"),
+                    prezzoOfferto,
+                    rs.getString("stato"),
+                    rs.getDate("dataofferta")
                 ));
             }
         }
@@ -103,14 +113,19 @@ public class OffertaDAO {
             ps.setString(1, codiceOfferta);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
+                Double prezzoOfferto = null;
+                Object prezzoObj = rs.getObject("prezzoofferto");
+                if (prezzoObj != null) {
+                    prezzoOfferto = rs.getDouble("prezzoofferto");
+                }
                 return new Offerta(
                     rs.getString("codiceofferta"),
-                    rs.getDate("dataofferta"),
-                    rs.getString("stato"),
-                    rs.getDouble("prezzoofferto"),
-                    rs.getString("tipo"),
+                    rs.getString("codiceannuncio"),
                     rs.getString("matricola"),
-                    rs.getString("codiceannuncio")
+                    rs.getString("tipo"),
+                    prezzoOfferto,
+                    rs.getString("stato"),
+                    rs.getDate("dataofferta")
                 );
             }
         }
@@ -169,5 +184,110 @@ public class OffertaDAO {
             }
         }
         return new double[] {0, 0, 0};
+    }
+    
+    // Invia offerta semplice (vendita/regalo)
+    public boolean inviaOfferta(Offerta offerta) throws SQLException {
+        String sql = "INSERT INTO offerta (codiceofferta, codiceannuncio, matricola, tipo, prezzoofferto, stato, dataofferta) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, offerta.getCodiceOfferta());
+            stmt.setString(2, offerta.getCodiceAnnuncio());
+            stmt.setString(3, offerta.getMatricola());
+            stmt.setString(4, offerta.getTipo());
+            if (offerta.getPrezzoOfferto() != null) {
+                stmt.setDouble(5, offerta.getPrezzoOfferto());
+            } else {
+                stmt.setNull(5, java.sql.Types.NUMERIC);
+            }
+            stmt.setString(6, offerta.getStato());
+            stmt.setDate(7, offerta.getDataOfferta());
+            
+            return stmt.executeUpdate() > 0;
+        }
+    }
+
+    // Invia offerta con oggetti (per scambi)
+    public boolean inviaOffertaConOggetti(Offerta offerta, List<String> codiciOggetti) throws SQLException {
+        conn.setAutoCommit(false);
+        try {
+            // Prima inserisci l'offerta
+            if (!inviaOfferta(offerta)) {
+                conn.rollback();
+                return false;
+            }
+            
+            // Poi inserisci gli oggetti associati
+            String sqlOffre = "INSERT INTO offre (codiceofferta, codiceoggetto) VALUES (?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(sqlOffre)) {
+                for (String codiceOggetto : codiciOggetti) {
+                    stmt.setString(1, offerta.getCodiceOfferta());
+                    stmt.setString(2, codiceOggetto);
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+            
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(true);
+        }
+    }
+
+    // Ottiene offerte ricevute sui propri annunci
+    public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
+        String sql = "SELECT o.* FROM offerta o " +
+                     "JOIN annuncio a ON o.codiceannuncio = a.codiceannuncio " +
+                     "WHERE a.matricola = ? " +
+                     "ORDER BY o.dataofferta DESC";
+        
+        List<Offerta> offerte = new ArrayList<>();
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, matricola);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                Double prezzoOfferto = null;
+                Object prezzoObj = rs.getObject("prezzoofferto");
+                if (prezzoObj != null) {
+                    prezzoOfferto = rs.getDouble("prezzoofferto");
+                }
+                
+                offerte.add(new Offerta(
+                    rs.getString("codiceofferta"),
+                    rs.getString("codiceannuncio"),
+                    rs.getString("matricola"),
+                    rs.getString("tipo"),
+                    prezzoOfferto,
+                    rs.getString("stato"),
+                    rs.getDate("dataofferta")
+                ));
+            }
+        }
+        
+        return offerte;
+    }
+    
+    // Accetta un'offerta
+    public boolean accettaOfferta(String codiceOfferta) throws SQLException {
+        String sql = "UPDATE offerta SET stato = 'accettata' WHERE codiceofferta = ? AND stato = 'inviata'";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codiceOfferta);
+            return ps.executeUpdate() == 1;
+        }
+    }
+    
+    // Rifiuta un'offerta
+    public boolean rifiutaOfferta(String codiceOfferta) throws SQLException {
+        String sql = "UPDATE offerta SET stato = 'rifiutata' WHERE codiceofferta = ? AND stato = 'inviata'";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codiceOfferta);
+            return ps.executeUpdate() == 1;
+        }
     }
 }

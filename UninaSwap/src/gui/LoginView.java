@@ -1,55 +1,57 @@
+// LoginView.java
 package gui;
 
+import Controller.Controller;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
-import model.Utente;
-import service.Service;
 
-import java.sql.SQLException;
 import java.util.function.Consumer;
 
 public class LoginView {
-
     private VBox root;
-    private TextField txtEmail;
-    private PasswordField txtPassword;
-    private Button btnLogin;
-    private Label lblMessage;
+    private TextField emailField;
+    private PasswordField passwordField;
+    private Button loginButton;
+    private Label messageLabel;
+    private Controller controller;
+    private Consumer<Boolean> onLoginSuccess;
 
-    public LoginView(Service service, Consumer<Utente> onLoginSuccess) {
+    public LoginView(Controller controller, Consumer<Boolean> onLoginSuccess) {
+        this.controller = controller;
+        this.onLoginSuccess = onLoginSuccess;
+        createUI();
+    }
+
+    private void createUI() {
         root = new VBox(10);
         root.setPadding(new Insets(20));
 
-        Label lblTitle = new Label("Login");
-        lblTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        emailField = new TextField();
+        emailField.setPromptText("Email");
 
-        txtEmail = new TextField();
-        txtEmail.setPromptText("Email");
+        passwordField = new PasswordField();
+        passwordField.setPromptText("Password");
 
-        txtPassword = new PasswordField();
-        txtPassword.setPromptText("Password");
+        loginButton = new Button("Login");
+        messageLabel = new Label();
 
-        lblMessage = new Label();
-        lblMessage.setStyle("-fx-text-fill: red;");
+        loginButton.setOnAction(e -> handleLogin());
 
-        btnLogin = new Button("Login");
-        btnLogin.setOnAction(e -> {
-            try {
-                Utente utente = service.login(txtEmail.getText(), txtPassword.getText());
-                if (utente != null) {
-                    lblMessage.setText("");
-                    onLoginSuccess.accept(utente); // callback per aprire dashboard
-                } else {
-                    lblMessage.setText("Email o password errati");
-                }
-            } catch (SQLException ex) {
-                ex.printStackTrace();
-                lblMessage.setText("Errore nel login");
-            }
-        });
+        root.getChildren().addAll(new Label("Benvenuto in UninaSwap"), emailField, passwordField, loginButton, messageLabel);
+    }
 
-        root.getChildren().addAll(lblTitle, txtEmail, txtPassword, btnLogin, lblMessage);
+    private void handleLogin() {
+        String email = emailField.getText();
+        String password = passwordField.getText();
+
+        boolean success = controller.login(email, password);
+        if (success) {
+            messageLabel.setText("");
+            onLoginSuccess.accept(true);
+        } else {
+            messageLabel.setText("Email o password errati");
+        }
     }
 
     public VBox getRoot() {
