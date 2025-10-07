@@ -72,8 +72,12 @@ public class HomePageView {
                     Node contentRcv = ricevuteBox;
                     root.getChildren().set(1, contentRcv);
                     HBox.setHgrow(contentRcv, Priority.ALWAYS);
-                    break;
                 }
+                case "oggetti":
+                    OggettiView oggettiView = new OggettiView(controller);
+                    root.getChildren().set(1, oggettiView.getRoot());
+                    break;
+                
 
                 // ...altri casi come già presenti
                 case "statistiche": {
@@ -134,7 +138,6 @@ public class HomePageView {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-
         bottomBox.getChildren().addAll(
                 statBox("Annunci", String.valueOf(totAnnunci)),
                 statBox("Offerte", String.valueOf(totOfferte)),
@@ -143,6 +146,7 @@ public class HomePageView {
         );
 
         contentArea.getChildren().addAll(welcomeLabel, centerBox, bottomBox);
+
         return contentArea;
     }
 
