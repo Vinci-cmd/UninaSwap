@@ -1,6 +1,3 @@
-/gui/
 /Controller/
-/service/
+/gui/
 /dao/
-/model/
-/utils/

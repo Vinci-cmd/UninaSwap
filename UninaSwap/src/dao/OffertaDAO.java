@@ -90,7 +90,7 @@ public class OffertaDAO {
                     rs.getString("tipo"),
                     prezzoOfferto,
                     rs.getString("stato"),
-                    rs.getDate("dataofferta")
+                    rs.getDate("data")
                 ));
             }
         }
