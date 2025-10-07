@@ -3,7 +3,7 @@ package dao;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import model.Annuncio;
+import model.Annuncio; 
 
 public class AnnuncioDAO {
     private Connection conn;
@@ -87,21 +87,25 @@ public class AnnuncioDAO {
         return lista;
     }
 
-    // Crea un nuovo annuncio
     public boolean creaAnnuncio(Annuncio annuncio) throws SQLException {
-        // Calcola nuovo codice
-        String last = getLastCodiceAnnuncio(); // es. "A0000042"
-        String prefix = "A";
+        String last = getLastCodiceAnnuncio(); // es. "AN0000042"
+        String prefix = "AN";
         int nextNum = 1;
         if (last != null && last.startsWith(prefix)) {
             String numPart = last.substring(prefix.length()); // "0000042"
-            nextNum = Integer.parseInt(numPart) + 1;          // 43
+            try {
+                nextNum = Integer.parseInt(numPart) + 1;          // 43
+            } catch(NumberFormatException e) {
+                System.err.println("Errore parsing codice annuncio: " + numPart);
+                throw e;
+            }
         }
-        String newCode = String.format(prefix + "%07d", nextNum); // "A0000043"
+        String newCode = String.format(prefix + "%05d", nextNum); // "AN0000043"
         annuncio.setCodiceAnnuncio(newCode);
 
         String sql = "INSERT INTO annuncio (codiceannuncio, descrizione, categoria, tipologia, prezzo, stato, datapubblicazione, matricola) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            System.out.println("DAO.creaAnnuncio: Inserimento annuncio con codice " + newCode);
             ps.setString(1, annuncio.getCodiceAnnuncio());
             ps.setString(2, annuncio.getDescrizione());
             ps.setString(3, annuncio.getCategoria());
@@ -114,9 +118,19 @@ public class AnnuncioDAO {
             ps.setString(6, annuncio.getStato());
             ps.setDate(7, new java.sql.Date(annuncio.getDataPubblicazione().getTime()));
             ps.setString(8, annuncio.getMatricola());
-            return ps.executeUpdate() == 1;
+            int rows = ps.executeUpdate();
+            System.out.println("DAO.creaAnnuncio: Righe inserite = " + rows);
+            if (!conn.getAutoCommit()) {
+                conn.commit();
+                System.out.println("DAO.creaAnnuncio: Commit eseguito manualmente");
+            } 
+            return rows == 1;
+        } catch (SQLException e) {
+            System.err.println("DAO.creaAnnuncio: Errore durante inserimento: " + e.getMessage());
+            throw e;
         }
     }
+
 
 
     // Aggiorna un annuncio esistente
@@ -195,15 +209,16 @@ public boolean modificaAnnuncio(Annuncio annuncio) throws SQLException {
     }
 }
 public String getLastCodiceAnnuncio() throws SQLException {
-    // Recupera solo i codici che iniziano con “A”
-    String sql = "SELECT MAX(codiceannuncio) AS maxcode FROM annuncio WHERE codiceannuncio LIKE 'A%'";
+    String sql = "SELECT MAX(codiceannuncio) AS maxcode FROM annuncio WHERE codiceannuncio LIKE 'AN%'";
     try (PreparedStatement ps = conn.prepareStatement(sql);
          ResultSet rs = ps.executeQuery()) {
         if (rs.next()) {
-            return rs.getString("maxcode"); // potrebbe essere null se nessun codice A%
+            return rs.getString("maxcode"); // null se nessun codice AN%
         }
     }
     return null;
 }
+
+
 
 }

@@ -18,6 +18,9 @@ public class SideMenuView {
     private Button btnAnnunciHeader;
     private VBox annunciSubmenu;
     private boolean annunciExpanded = false;
+    
+    // Nuovo: pulsante home
+    private Button btnHome;
 
     public SideMenuView() {
         createUI();
@@ -34,6 +37,11 @@ public class SideMenuView {
         toggleButton.setStyle("-fx-font-size: 18; -fx-background-color: #34495e; -fx-text-fill: white;");
         toggleButton.setMaxWidth(Double.MAX_VALUE);
         toggleButton.setOnAction(e -> toggleMenu());
+
+        // Aggiunta tasto Home con simbolo ⌂
+        btnHome = new Button("⌂ Home");
+        styleMenuButton(btnHome);
+        btnHome.setOnAction(e -> notifyMenuSelection("home"));
 
         // Header "Annunci" con freccia
         btnAnnunciHeader = new Button("Annunci ▶");
@@ -62,7 +70,8 @@ public class SideMenuView {
         btnGestioneOfferte.setOnAction(e -> notifyMenuSelection("offerte"));
         btnStatistiche.setOnAction(e -> notifyMenuSelection("statistiche"));
 
-        menuBox.getChildren().addAll(toggleButton, btnAnnunciHeader, annunciSubmenu, btnGestioneOfferte, btnStatistiche);
+        // Inserimento del nuovo pulsante home DOPO il toggleButton
+        menuBox.getChildren().addAll(toggleButton, btnHome, btnAnnunciHeader, annunciSubmenu, btnGestioneOfferte, btnStatistiche);
     }
 
     private void styleMenuButton(Button btn) {

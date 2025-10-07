@@ -12,7 +12,7 @@ import javafx.stage.Stage;
 import model.Annuncio;
 
 import java.sql.SQLException;
-import java.util.Date;
+import java.sql.Date;
 import java.util.List;
 
 public class AnnunciView {
@@ -31,6 +31,16 @@ public class AnnunciView {
         root = new VBox(10);
         root.setPadding(new Insets(12));
 
+        // Pulsante home
+        Button btnHome = new Button("⌂");
+        btnHome.setOnAction(e -> {
+            // Sostituisci con la logica per tornare alla home
+            System.out.println("Torna alla home!");
+        });
+
+        HBox topBar = new HBox(btnHome);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+
         Label title = new Label("Gestisci i tuoi Annunci");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
 
@@ -47,15 +57,12 @@ public class AnnunciView {
         colPrezzo.setCellValueFactory(new PropertyValueFactory<>("prezzo"));
         TableColumn<Annuncio, String> colStato = new TableColumn<>("Stato");
         colStato.setCellValueFactory(new PropertyValueFactory<>("stato"));
-
         tableAnnunci.getColumns().addAll(colCodice, colCategoria, colTipologia, colDescrizione, colPrezzo, colStato);
         tableAnnunci.setPrefHeight(300);
 
         Button btnCrea = new Button("Crea");
         Button btnModifica = new Button("Modifica");
         Button btnElimina = new Button("Elimina");
-        Button btnAggiorna = new Button("Aggiorna");
-
         btnCrea.setOnAction(e -> openAnnuncioDialog(null));
         btnModifica.setOnAction(e -> {
             Annuncio sel = tableAnnunci.getSelectionModel().getSelectedItem();
@@ -73,12 +80,9 @@ public class AnnunciView {
             }
             eliminaAnnuncio(sel);
         });
-        btnAggiorna.setOnAction(e -> loadAnnunci());
-
-        HBox actions = new HBox(10, btnCrea, btnModifica, btnElimina, btnAggiorna);
+        HBox actions = new HBox(10, btnCrea, btnModifica, btnElimina);
         actions.setAlignment(Pos.CENTER_LEFT);
-
-        root.getChildren().addAll(title, tableAnnunci, actions);
+        root.getChildren().addAll(topBar, title, tableAnnunci, actions);
     }
 
     private void loadAnnunci() {
@@ -95,12 +99,10 @@ public class AnnunciView {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.setTitle(existing == null ? "Nuovo Annuncio" : "Modifica Annuncio");
-
         GridPane form = new GridPane();
         form.setPadding(new Insets(12));
         form.setHgap(10);
         form.setVgap(10);
-
         TextField txtCategoria = new TextField();
         ComboBox<String> cbTipologia = new ComboBox<>();
         cbTipologia.getItems().addAll("vendita", "scambio", "regalo");
@@ -110,6 +112,7 @@ public class AnnunciView {
         HBox prezzoBox = new HBox(5, lblPrezzo, txtPrezzo);
         prezzoBox.setAlignment(Pos.CENTER_LEFT);
 
+        // Stato solo per modifica
         ComboBox<String> cbStato = new ComboBox<>();
         cbStato.getItems().addAll("attivo", "scaduto", "in attesa");
 
@@ -117,11 +120,10 @@ public class AnnunciView {
             txtCategoria.setText(existing.getCategoria());
             cbTipologia.setValue(existing.getTipologia());
             txtDescrizione.setText(existing.getDescrizione());
-            txtPrezzo.setText(String.valueOf(existing.getPrezzo()));
+            txtPrezzo.setText(existing.getPrezzo() != null ? existing.getPrezzo().toString() : "");
             cbStato.setValue(existing.getStato());
         }
 
-        // Mostra/nascondi prezzo in base a tipologia
         prezzoBox.setVisible("vendita".equals(cbTipologia.getValue()));
         cbTipologia.setOnAction(e -> prezzoBox.setVisible("vendita".equals(cbTipologia.getValue())));
 
@@ -129,61 +131,57 @@ public class AnnunciView {
         form.addRow(1, new Label("Tipologia:"), cbTipologia);
         form.addRow(2, new Label("Descrizione:"), txtDescrizione);
         form.add(prezzoBox, 1, 3);
-        form.addRow(4, new Label("Stato:"), cbStato);
+
+        if (existing != null) {
+            form.addRow(4, new Label("Stato:"), cbStato);
+        }
 
         Button btnConferma = new Button(existing == null ? "Crea" : "Aggiorna");
         btnConferma.setOnAction(e -> {
-            if (!validateForm(txtCategoria, cbTipologia, txtDescrizione, txtPrezzo, cbStato)) return;
-                try {
-                    boolean ok;
-                    if (existing == null) {
-                        ok = controller.creaAnnuncio(
-                            txtCategoria.getText(),
-                            cbTipologia.getValue(),
-                            txtDescrizione.getText(),
-                            "vendita".equals(cbTipologia.getValue())
-                                ? Double.parseDouble(txtPrezzo.getText())
-                                : 0.0,
-                            cbStato.getValue()
-                        );
-                    } else {
-                        ok = controller.modificaAnnuncio(
-                            existing.getCodiceAnnuncio(),
-                            txtCategoria.getText(),
-                            cbTipologia.getValue(),
-                            txtDescrizione.getText(),
-                            "vendita".equals(cbTipologia.getValue())
-                                ? Double.parseDouble(txtPrezzo.getText())
-                                : 0.0,
-                            cbStato.getValue()
-                        );
-                    }
-                    if (!ok) {
-                        showAlert("Operazione non riuscita");
-                        return;
-                    }
-                    loadAnnunci();
-                    dialog.close();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                    showAlert("Errore salvataggio: " + ex.getMessage());
+            if (!validateForm(txtCategoria, cbTipologia, txtDescrizione, txtPrezzo, cbStato, existing != null)) return;
+            try {
+                boolean ok;
+                if (existing == null) {
+                    ok = controller.creaAnnuncio(
+                        txtCategoria.getText(),
+                        cbTipologia.getValue(),
+                        txtDescrizione.getText(),
+                        "vendita".equals(cbTipologia.getValue()) ? Double.parseDouble(txtPrezzo.getText()) : 0.0
+                    );
+                } else {
+                    ok = controller.modificaAnnuncio(
+                        existing.getCodiceAnnuncio(),
+                        txtCategoria.getText(),
+                        cbTipologia.getValue(),
+                        txtDescrizione.getText(),
+                        "vendita".equals(cbTipologia.getValue()) ? Double.parseDouble(txtPrezzo.getText()) : 0.0,
+                        cbStato.getValue()
+                    );
                 }
-            });
-
+                if (!ok) {
+                    showAlert("Operazione non riuscita");
+                    return;
+                }
+                dialog.close();
+                loadAnnunci(); // <-- aggiorna dopo conferma
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+                showAlert("Errore salvataggio: " + ex.getMessage());
+            }
+        });
 
         VBox box = new VBox(12, form, btnConferma);
         box.setPadding(new Insets(12));
-
-        dialog.setScene(new Scene(box, 450, 320));
+        dialog.setScene(new Scene(box, 450, existing == null ? 260 : 320));
         dialog.showAndWait();
     }
 
-    private boolean validateForm(TextField cat, ComboBox<String> tip, TextField desc, TextField prezzo, ComboBox<String> stato) {
+    private boolean validateForm(TextField cat, ComboBox<String> tip, TextField desc, TextField prezzo, ComboBox<String> stato, boolean isEdit) {
         if (cat.getText().isBlank()
             || tip.getValue() == null
             || desc.getText().isBlank()
-            || stato.getValue() == null
-            || ("vendita".equals(tip.getValue()) && prezzo.getText().isBlank())) {
+            || ("vendita".equals(tip.getValue()) && prezzo.getText().isBlank())
+            || (isEdit && stato.getValue() == null)) {
             showAlert("Compila tutti i campi obbligatori.");
             return false;
         }
@@ -199,13 +197,12 @@ public class AnnunciView {
     }
 
     private void eliminaAnnuncio(Annuncio sel) {
-        Alert conf = new Alert(Alert.AlertType.CONFIRMATION,
-            "Eliminare l'annuncio selezionato?", ButtonType.YES, ButtonType.NO);
+        Alert conf = new Alert(Alert.AlertType.CONFIRMATION, "Eliminare l'annuncio selezionato?", ButtonType.YES, ButtonType.NO);
         conf.showAndWait().ifPresent(bt -> {
             if (bt == ButtonType.YES) {
                 try {
                     controller.eliminaAnnuncio(sel.getCodiceAnnuncio());
-                    loadAnnunci();
+                    loadAnnunci(); // <-- aggiorna dopo eliminazione
                 } catch (SQLException e) {
                     e.printStackTrace();
                     showAlert("Errore eliminazione: " + e.getMessage());
