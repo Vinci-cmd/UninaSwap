@@ -10,34 +10,101 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Controller dell'applicazione UninaSwap.
+ * Gestisce login/registrazione, annunci, offerte e oggetti, delegando la logica al Service.
+ */
 public class Controller {
-    private Service service;
+
+    // =========================================================
+    // == CAMPI / COSTRUTTORI
+    // =========================================================
+    private final Service service;
     private Utente utenteCorrente;
 
     public Controller(Service service) {
         this.service = service;
     }
 
+    // =========================================================
+    // == AUTHENTICATION (Login / Registrazione / Logout)
+    // =========================================================
+
+    // -------------------- AUTH: Login --------------------
     public boolean login(String email, String password) {
         try {
-            Utente utente = service.login(email, password);
+            String e = email == null ? "" : email.trim();
+            String p = password == null ? "" : password.trim();
+            if (e.isEmpty() || p.isEmpty()) {
+                showError("Email e password sono obbligatorie.");
+                return false;
+            }
+            Utente utente = service.login(e, p); // delega al Service
             if (utente != null) {
                 utenteCorrente = utente;
                 return true;
             }
-        } catch (SQLException e) {
-            showError("Errore login: " + e.getMessage());
+        } catch (SQLException ex) {
+            showError("Errore login: " + ex.getMessage());
         }
         return false;
     }
 
+    // -------------------- AUTH: Registrazione --------------------
+    public boolean register(String nome, String cognome, String matricola, String email, String password, String universita) {
+        try {
+            String n = safeTrim(nome);
+            String c = safeTrim(cognome);
+            String m = safeTrim(matricola);
+            String e = safeTrim(email);
+            String p = safeTrim(password);
+            String u = safeTrim(universita);
+
+            if (n.isEmpty() || c.isEmpty() || m.isEmpty() || e.isEmpty() || p.isEmpty() || u.isEmpty()) {
+                showError("Tutti i campi sono obbligatori.");
+                return false;
+            }
+            if (!isLikelyEmail(e)) {
+                showError("Email non valida.");
+                return false;
+            }
+            if (p.length() < 8) {
+                showError("La password deve avere almeno 8 caratteri.");
+                return false;
+            }
+
+            Utente nuovo = new Utente(m, n, c, e, p, u);
+            boolean ok = service.creaUtente(nuovo);
+            if (!ok) showError("Registrazione non riuscita.");
+            return ok;
+
+        } catch (SQLException ex) {
+            if ("23505".equals(ex.getSQLState())) {
+                showError("Email o matricola già registrate.");
+            } else {
+                showError("Errore registrazione: " + ex.getMessage());
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Restituisce l'utente correntemente loggato (può essere null).
+     */
     public Utente getUtenteCorrente() {
         return utenteCorrente;
     }
 
+    /**
+     * Esegue il logout dell'utente corrente.
+     */
     public void logout() {
         utenteCorrente = null;
     }
+
+    // =========================================================
+    // == ANNUNCI
+    // =========================================================
 
     public List<Annuncio> getAnnunciAttiviRaw() throws SQLException {
         return service.getAnnunciAttivi();
@@ -61,8 +128,63 @@ public class Controller {
         }
     }
 
+    public List<Annuncio> getAnnunciByUtente(String matricola) throws SQLException {
+        return service.getAnnunciByUtente(matricola);
+    }
+
+    public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo) throws SQLException {
+        Date oggi = new Date(System.currentTimeMillis());
+        Annuncio nuovoAnnuncio = new Annuncio(
+                null,
+                descrizione,
+                categoria,
+                tipologia,
+                prezzo,
+                "attivo",
+                oggi,
+                utenteCorrente.getMatricola()
+        );
+        return service.creaAnnuncio(nuovoAnnuncio);
+    }
+
+    public boolean modificaAnnuncio(String codiceAnnuncio,
+                                    String categoria,
+                                    String tipologia,
+                                    String descrizione,
+                                    double prezzo,
+                                    String stato) throws SQLException {
+        Annuncio esistente = service.getAnnuncioByCodice(codiceAnnuncio);
+
+        Annuncio aggiornato = new Annuncio(
+                codiceAnnuncio,
+                descrizione,
+                categoria,
+                tipologia,
+                prezzo,
+                stato,
+                esistente.getDataPubblicazione(),
+                esistente.getMatricola()
+        );
+
+        // Usa quello che preferisci tra aggiornaAnnuncio / modificaAnnuncio
+        return service.aggiornaAnnuncio(aggiornato);
+        // return service.modificaAnnuncio(aggiornato);
+    }
+
+    public void eliminaAnnuncio(String codiceAnnuncio) throws SQLException {
+        service.eliminaAnnuncio(codiceAnnuncio);
+    }
+
+    // =========================================================
+    // == OFFERTE
+    // =========================================================
+
     public List<Offerta> getOfferteByAnnuncio(String codiceAnnuncio) throws SQLException {
         return service.getOfferteByAnnuncio(codiceAnnuncio);
+    }
+
+    public List<Offerta> getOfferteByUtente(String matricola) throws SQLException {
+        return service.getOfferteByUtente(matricola);
     }
 
     public boolean inviaOfferta(String codiceAnnuncio, String tipo, Double prezzoOfferto) throws SQLException {
@@ -90,18 +212,53 @@ public class Controller {
             return false;
         }
     }
+ // =========================================================
+ // == STATISTICHE (bridge verso Service)
+ // =========================================================
 
-    private void showError(String message) {
-        System.err.println(message);
-    }
+ /** Totale offerte complessive. */
+ public int getTotaleOfferte() {
+     try {
+         return service.getTotaleOfferte();
+     } catch (SQLException e) {
+         showError("Errore getTotaleOfferte: " + e.getMessage());
+         return 0;
+     }
+ }
 
-    public List<Annuncio> getAnnunciByUtente(String matricola) throws SQLException {
-        return service.getAnnunciByUtente(matricola);
-    }
+ /** Totale offerte per tipologia (es. "vendita", "scambio", ...). */
+ public int getTotaleOffertePerTipologia(String tipologia) {
+     try {
+         return service.getTotaleOffertePerTipologia(tipologia);
+     } catch (SQLException e) {
+         showError("Errore getTotaleOffertePerTipologia: " + e.getMessage());
+         return 0;
+     }
+ }
 
-    public List<Offerta> getOfferteByUtente(String matricola) throws SQLException {
-        return service.getOfferteByUtente(matricola);
-    }
+ /** Offerte accettate per tipologia. */
+ public int getOfferteAccettatePerTipologia(String tipologia) {
+     try {
+         return service.getOfferteAccettatePerTipologia(tipologia);
+     } catch (SQLException e) {
+         showError("Errore getOfferteAccettatePerTipologia: " + e.getMessage());
+         return 0;
+     }
+ }
+
+ /** Eventuali statistiche aggiuntive lato service (se ti servono). */
+ public double[] getStatisticheVenditeAccettate() {
+     try {
+         return service.getStatisticheVenditeAccettate();
+     } catch (SQLException e) {
+         showError("Errore getStatisticheVenditeAccettate: " + e.getMessage());
+         return new double[0];
+     }
+ }
+
+    // =========================================================
+    // == OGGETTI
+    // =========================================================
 
     public List<String> getOggettiUtente(String matricola) throws SQLException {
         List<Oggetto> oggetti = service.getOggettiUtente(matricola);
@@ -112,43 +269,19 @@ public class Controller {
         return codici;
     }
 
-    public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo) throws SQLException {
-        Date oggi = new Date(System.currentTimeMillis());
-        Annuncio nuovoAnnuncio = new Annuncio(
-            null,
-            descrizione,
-            categoria,
-            tipologia,
-            prezzo,
-            "attivo", // stato impostato automaticamente
-            oggi,
-            utenteCorrente.getMatricola()
-        );
-        return service.creaAnnuncio(nuovoAnnuncio);
+    // =========================================================
+    // == UTILITY INTERNE
+    // =========================================================
+
+    private void showError(String message) {
+        System.err.println(message);
     }
 
-    public boolean modificaAnnuncio(String codiceAnnuncio,
-                                    String categoria,
-                                    String tipologia,
-                                    String descrizione,
-                                    double prezzo,
-                                    String stato) throws SQLException {
-        Annuncio esistente = service.getAnnuncioByCodice(codiceAnnuncio);
-
-        Annuncio aggiornato = new Annuncio(
-                codiceAnnuncio,
-                descrizione,
-                categoria,
-                tipologia,
-                prezzo,
-                stato,
-                esistente.getDataPubblicazione(),
-                esistente.getMatricola()
-        );
-        return service.modificaAnnuncio(aggiornato);
+    private static String safeTrim(String s) {
+        return s == null ? "" : s.trim();
     }
 
-    public void eliminaAnnuncio(String codiceAnnuncio) throws SQLException {
-        service.eliminaAnnuncio(codiceAnnuncio);
+    private static boolean isLikelyEmail(String s) {
+        return s != null && s.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     }
 }
