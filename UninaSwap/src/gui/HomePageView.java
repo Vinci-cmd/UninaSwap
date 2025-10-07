@@ -7,7 +7,9 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 
 import java.sql.SQLException;
 
@@ -15,16 +17,24 @@ public class HomePageView {
     private HBox root;
     private final Controller controller;
 
+    // ↓↓↓ aggiunto: teniamo un riferimento alla sidebar
+    private SideMenuView sideMenu;
+
     public HomePageView(Controller controller) {
         this.controller = controller;
         createUI();
     }
 
     private void createUI() {
-        root = new HBox();
+        root = new HBox(16);
+        root.setPadding(new Insets(16));
+        root.setStyle(
+            "-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);" +
+            "-fx-font-family: 'Segoe UI','Roboto','Arial';"
+        );
 
-        // menu laterale
-        SideMenuView sideMenu = new SideMenuView();
+        // menu laterale (usa il campo)
+        sideMenu = new SideMenuView();
 
         // contenuto iniziale: home
         Node contentArea = createHomeContentArea();
@@ -33,7 +43,7 @@ public class HomePageView {
         root.getChildren().addAll(sideMenu.getRoot(), contentArea);
         HBox.setHgrow(contentArea, Priority.ALWAYS);
 
-        // navigazione menu laterale
+        // navigazione menu laterale (fixato break mancante su offerte_ricevute)
         sideMenu.setOnMenuSelection(key -> {
             switch (key) {
                 case "home": {
@@ -72,16 +82,16 @@ public class HomePageView {
                     Node contentRcv = ricevuteBox;
                     root.getChildren().set(1, contentRcv);
                     HBox.setHgrow(contentRcv, Priority.ALWAYS);
-                }
-                case "oggetti":
-                    OggettiView oggettiView = new OggettiView(controller);
-                    root.getChildren().set(1, oggettiView.getRoot());
                     break;
-                
-
-                // ...altri casi come già presenti
+                }
+                case "oggetti": {
+                    OggettiView oggettiView = new OggettiView(controller);
+                    Node newContent = oggettiView.getRoot();
+                    root.getChildren().set(1, newContent);
+                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                    break;
+                }
                 case "statistiche": {
-                    // integra il ReportView nel pannello centrale
                     ReportView reportView = new ReportView(controller);
                     Node newContent = reportView.getRoot();
                     root.getChildren().set(1, newContent);
@@ -92,23 +102,62 @@ public class HomePageView {
         });
     }
 
-    /** Crea il contenuto della home */
-    private VBox createHomeContentArea() {
-        VBox contentArea = new VBox(15);
-        contentArea.setPadding(new Insets(20));
-        contentArea.setPrefWidth(700);
+    /** Crea il contenuto della home (header + hero + notifiche + stats) */
+    private Node createHomeContentArea() {
+        BorderPane content = new BorderPane();
+        content.setPadding(new Insets(10));
 
-        String nome = controller.getUtenteCorrente() != null && controller.getUtenteCorrente().getNome() != null
+        // HEADER
+        HBox header = new HBox(8);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(6, 6, 16, 6));
+
+        String nome = (controller.getUtenteCorrente() != null && controller.getUtenteCorrente().getNome() != null)
                 ? controller.getUtenteCorrente().getNome()
                 : "Utente";
-        Label welcomeLabel = new Label("Ciao, " + nome);
-        welcomeLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
-        welcomeLabel.setAlignment(Pos.CENTER);
 
-        // notifiche finte per ora
-        VBox centerBox = new VBox(10);
-        Label notifLabel = new Label("Notifiche recenti:");
-        notifLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        Label brand = new Label("UninaSwap");
+        brand.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 20px; -fx-font-weight: 900;");
+        Label sub = new Label("• Benvenuto, " + nome);
+        sub.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px;");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // Bottone "Aiuto" (per ora rimane placeholder, lo colleghiamo dopo)
+        Button help = ghostButton("Aiuto", () -> {}); 
+
+        header.getChildren().addAll(brand, sub, spacer, help);
+        content.setTop(header);
+
+        // CENTRO
+        VBox center = new VBox(16);
+        center.setFillWidth(true);
+
+        // HERO
+        HBox heroRow = new HBox(16);
+        heroRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox heroCard = card(
+                h1("Dashboard"),
+                subtitle("Gestisci annunci, offerte e oggetti in un'unica schermata ✨")
+        );
+
+        VBox quickActions = card(
+                title("Azioni rapide"),
+                row(
+                        // ← QUI: “Crea annuncio” FUNZIONA
+                        primaryButton("Crea annuncio", this::openAnnunciGestisci),
+                        // Questi due li colleghiamo dopo, step-by-step
+                        ghostButton("Gestisci annunci", () -> navigate("annunci_gestisci")),
+                        ghostButton("Lista annunci", () -> navigate("annunci_lista"))
+                )
+        );
+
+        HBox.setHgrow(heroCard, Priority.ALWAYS);
+        heroRow.getChildren().addAll(heroCard, quickActions);
+
+        // NOTIFICHE
         ListView<String> notifList = new ListView<>();
         notifList.setPrefHeight(200);
         notifList.getItems().addAll(
@@ -116,19 +165,24 @@ public class HomePageView {
                 "Scambio programmato domani",
                 "Annuncio #123 ha ricevuto una nuova offerta"
         );
-        centerBox.getChildren().addAll(notifLabel, notifList);
-        centerBox.setAlignment(Pos.CENTER);
+        notifList.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-control-inner-background: rgba(255,255,255,0.04);" +
+            "-fx-background-insets: 0;" +
+            "-fx-text-fill: #EAF0FF;"
+        );
 
-        // statistiche rapide senza bottone report
-        HBox bottomBox = new HBox(30);
-        bottomBox.setPadding(new Insets(15));
-        bottomBox.setAlignment(Pos.CENTER);
+        VBox notifCard = card(
+                title("Notifiche recenti"),
+                subtitle("Le ultime attività del tuo account"),
+                notifList
+        );
 
-        int totAnnunci = 0;
-        int totOfferte = 0;
-        int totOggetti = 0;
-        int totAnnunciPersonali = 0;
+        // STATISTICHE
+        HBox statsRow = new HBox(16);
+        statsRow.setAlignment(Pos.CENTER_LEFT);
 
+        int totAnnunci = 0, totOfferte = 0, totOggetti = 0, totAnnunciPersonali = 0;
         try {
             totAnnunci = controller.getAnnunciAttiviRaw().size();
             String matricola = controller.getUtenteCorrente() != null ? controller.getUtenteCorrente().getMatricola() : "";
@@ -138,32 +192,153 @@ public class HomePageView {
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        bottomBox.getChildren().addAll(
+
+        statsRow.getChildren().addAll(
                 statBox("Annunci", String.valueOf(totAnnunci)),
                 statBox("Offerte", String.valueOf(totOfferte)),
                 statBox("Oggetti", String.valueOf(totOggetti)),
                 statBox("Annunci Personali", String.valueOf(totAnnunciPersonali))
         );
 
-        contentArea.getChildren().addAll(welcomeLabel, centerBox, bottomBox);
+        VBox statsCard = card(
+                title("Statistiche rapide"),
+                subtitle("Panoramica del tuo profilo"),
+                statsRow
+        );
 
-        return contentArea;
+        center.getChildren().addAll(heroRow, notifCard, statsCard);
+        content.setCenter(center);
+
+        return content;
+    }
+
+    // ====== ACTION: apre la vista “gestisci/crea annuncio” ======
+    private void openAnnunciGestisci() {
+        AnnunciView annunciView = new AnnunciView(controller);
+        Node newContent = annunciView.getRoot();
+        root.getChildren().set(1, newContent);
+        HBox.setHgrow(newContent, Priority.ALWAYS);
+
+        // Se in futuro la tua SideMenuView espone un metodo di selezione:
+        // sideMenu.select("annunci_gestisci");
+    }
+
+    // ======= UI HELPERS (inline style) =======
+    private VBox card(Node... children) {
+        VBox card = new VBox(10, children);
+        card.setPadding(new Insets(18));
+        card.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.06);" +
+            "-fx-background-radius: 18;" +
+            "-fx-border-radius: 18;" +
+            "-fx-border-color: rgba(255,255,255,0.10);" +
+            "-fx-border-width: 1;"
+        );
+        card.setEffect(new DropShadow(24, Color.color(0,0,0,0.45)));
+        return card;
+    }
+
+    private HBox row(Node... children) {
+        HBox r = new HBox(10, children);
+        r.setAlignment(Pos.CENTER_LEFT);
+        return r;
+    }
+
+    private Label h1(String s) {
+        Label l = new Label(s);
+        l.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 22px; -fx-font-weight: 900;");
+        return l;
+    }
+
+    private Label title(String s) {
+        Label l = new Label(s);
+        l.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 16px; -fx-font-weight: 800;");
+        return l;
+    }
+
+    private Label subtitle(String s) {
+        Label l = new Label(s);
+        l.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px;");
+        return l;
+    }
+
+    private Button primaryButton(String text, Runnable action) {
+        Button b = new Button(text);
+        b.setOnAction(e -> action.run());
+        b.setStyle(
+            "-fx-background-color: #4f8cff;" +
+            "-fx-text-fill: white;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-weight: 700;"
+        );
+        b.setOnMouseEntered(e -> b.setStyle(
+            "-fx-background-color: #3b6fe0; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        b.setOnMouseExited(e -> b.setStyle(
+            "-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        return b;
+    }
+
+    private Button ghostButton(String text, Runnable action) {
+        Button b = new Button(text);
+        b.setOnAction(e -> action.run());
+        b.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-border-color: rgba(255,255,255,0.20);" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-weight: 700;"
+        );
+        b.setOnMouseEntered(e -> b.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.08);" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-border-color: rgba(255,255,255,0.20);" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        b.setOnMouseExited(e -> b.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-border-color: rgba(255,255,255,0.20);" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        return b;
     }
 
     private VBox statBox(String title, String value) {
         Label t = new Label(title);
-        t.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        t.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px; -fx-font-weight: 800;");
         Label v = new Label(value);
-        v.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #1976d2;");
-        VBox box = new VBox(5, t, v);
-        box.setPadding(new Insets(20));
-        box.setStyle("-fx-background-color: #e9eefa; -fx-border-radius: 5; -fx-background-radius: 5;");
+        v.setStyle("-fx-text-fill: white; -fx-font-size: 22px; -fx-font-weight: 900;");
+
+        VBox box = new VBox(6, t, v);
+        box.setPadding(new Insets(16));
         box.setAlignment(Pos.CENTER);
-        box.setPrefSize(150, 100);
+        box.setPrefSize(160, 100);
+        box.setStyle(
+            "-fx-background-color: linear-gradient(to bottom right, rgba(79,140,255,0.18), rgba(122,247,195,0.18));" +
+            "-fx-background-radius: 14;" +
+            "-fx-border-radius: 14;" +
+            "-fx-border-color: rgba(255,255,255,0.18);" +
+            "-fx-border-width: 1;"
+        );
+        box.setEffect(new DropShadow(14, Color.color(0,0,0,0.35)));
         return box;
     }
 
     public HBox getRoot() {
         return root;
+    }
+
+    private void navigate(String key) {
+        // Placeholder per le altre azioni: le collegheremo step-by-step
+        System.out.println("Vai a: " + key);
     }
 }

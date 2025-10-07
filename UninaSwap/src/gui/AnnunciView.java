@@ -1,303 +1,599 @@
 package gui;
 
 import Controller.Controller;
+import javafx.animation.PauseTransition;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
+import javafx.util.StringConverter;
+import javafx.util.converter.DoubleStringConverter;
 import model.Annuncio;
 
 import java.sql.SQLException;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
+/**
+ * AnnunciView — robusta e coerente con lo stile dark.
+ * - Filtri stabili con FilteredList/SortedList
+ * - ComboBox non più “autofiltranti” (niente mutate dell’items), così le tendine mostrano sempre le opzioni
+ * - Ricerca con debounce (200ms) per evitare ricarichi e glitch
+ * - Tabella leggibile: zebra, hover soft, badge stato, prezzo formattato
+ * - Dialog semplificato (categoria editabile, ma senza mutare items a runtime)
+ */
 public class AnnunciView {
 
     private VBox root;
-    private TableView<Annuncio> tableAnnunci;
-    private Controller controller;
+    private final Controller controller;
+
+    // Dati
+    private final ObservableList<Annuncio> masterData = FXCollections.observableArrayList();
+    private FilteredList<Annuncio> filtered;
+    private SortedList<Annuncio> sorted;
+
+    // UI
+    private TableView<Annuncio> table;
     private ComboBox<String> cbCategoria;
     private ComboBox<String> cbTipologia;
     private TextField tfSearch;
-    private Set<String> categorieGlobali;
+    private Label emptyLabel;
+
+    // Filtri
+    private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(200));
+    private List<String> categorie; // snapshot per i filtri
 
     public AnnunciView(Controller controller) {
         this.controller = controller;
         createUI();
-        loadAnnunciConFiltri();
+        reloadData(); // carica dati UNA volta e li filtra
     }
 
+    // ============================== UI ==============================
     private void createUI() {
-        root = new VBox(10);
-        root.setPadding(new Insets(12));
+        root = new VBox(16);
+        root.setPadding(new Insets(16));
+        root.setStyle(
+            "-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);" +
+            "-fx-font-family: 'Segoe UI','Roboto','Arial';"
+        );
 
+        // Header minimale
         Label title = new Label("I miei Annunci");
-        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        title.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 20px; -fx-font-weight: 900;");
+        HBox header = new HBox(title);
+        header.setAlignment(Pos.CENTER_LEFT);
 
-        // FILTRI
-        HBox filtriBox = new HBox(10);
-        filtriBox.setAlignment(Pos.CENTER_LEFT);
+        // ===== Card Filtri =====
+        VBox filtersCard = card();
+        filtersCard.setSpacing(10);
 
-        // ComboBox categoria editabile come OggettiView
-        try {
-            categorieGlobali = controller.getAnnunciAttiviRaw().stream()
-                .map(a -> a.getCategoria())
-                .filter(cat -> cat != null && !cat.isBlank())
-                .collect(Collectors.toSet());
-        } catch (Exception ignored) {
-            categorieGlobali = Set.of();
-        }
+        HBox filters = new HBox(10);
+        filters.setAlignment(Pos.CENTER_LEFT);
 
-        cbCategoria = new ComboBox<>();
-        cbCategoria.setEditable(true);
-        cbCategoria.setPromptText("Categoria");
-        cbCategoria.getItems().addAll(categorieGlobali);
-        // Live filter
-        cbCategoria.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
-            String input = newVal.toLowerCase();
-            List<String> filtered = categorieGlobali.stream()
-                    .filter(cat -> cat.toLowerCase().contains(input))
-                    .collect(Collectors.toList());
-            if (!(filtered.size() == cbCategoria.getItems().size() && cbCategoria.getItems().containsAll(filtered)))
-                cbCategoria.getItems().setAll(filtered.isEmpty() ? categorieGlobali : filtered);
-            loadAnnunciConFiltri();
-        });
-
+        // Tipologia
         cbTipologia = new ComboBox<>();
-        cbTipologia.setPromptText("Tipologia");
-        cbTipologia.getItems().addAll("vendita", "scambio", "regalo");
-        cbTipologia.setOnAction(e -> loadAnnunciConFiltri());
+        cbTipologia.getItems().addAll("Tutte le tipologie", "vendita", "scambio", "regalo");
+        cbTipologia.setValue("Tutte le tipologie");
+        styleCombo(cbTipologia);
+        styleComboItems(cbTipologia);
+        cbTipologia.setOnAction(e -> applyFilters());
 
-        tfSearch = new TextField();
-        tfSearch.setPromptText("Cerca annuncio...");
-        tfSearch.setOnKeyReleased(e -> loadAnnunciConFiltri());
+        // Categoria (NON editabile qui: evitiamo glitch. La ricerca testuale la gestiamo in tfSearch)
+        cbCategoria = new ComboBox<>();
+        cbCategoria.setPromptText("Tutte le categorie");
+        cbCategoria.setValue(null); // null = tutte
+        styleCombo(cbCategoria);
+        styleComboItems(cbCategoria);
+        cbCategoria.setOnAction(e -> applyFilters());
 
-        filtriBox.getChildren().addAll(cbCategoria, cbTipologia, tfSearch);
-
-        tableAnnunci = new TableView<>();
-        TableColumn<Annuncio, String> colCodice = new TableColumn<>("Codice");
-        colCodice.setCellValueFactory(new PropertyValueFactory<>("codiceAnnuncio"));
-        TableColumn<Annuncio, String> colCategoria = new TableColumn<>("Categoria");
-        colCategoria.setCellValueFactory(new PropertyValueFactory<>("categoria"));
-        TableColumn<Annuncio, String> colTipologia = new TableColumn<>("Tipologia");
-        colTipologia.setCellValueFactory(new PropertyValueFactory<>("tipologia"));
-        TableColumn<Annuncio, String> colDescrizione = new TableColumn<>("Descrizione");
-        colDescrizione.setCellValueFactory(new PropertyValueFactory<>("descrizione"));
-        TableColumn<Annuncio, Double> colPrezzo = new TableColumn<>("Prezzo");
-        colPrezzo.setCellValueFactory(new PropertyValueFactory<>("prezzo"));
-        TableColumn<Annuncio, String> colStato = new TableColumn<>("Stato");
-        colStato.setCellValueFactory(new PropertyValueFactory<>("stato"));
-        tableAnnunci.getColumns().addAll(colCodice, colCategoria, colTipologia, colDescrizione, colPrezzo, colStato);
-        tableAnnunci.setPrefHeight(300);
-
-        Button btnCrea = new Button("Crea");
-        Button btnModifica = new Button("Modifica");
-        Button btnElimina = new Button("Elimina");
-        btnCrea.setOnAction(e -> openAnnuncioDialog(null));
-        btnModifica.setOnAction(e -> {
-            Annuncio sel = tableAnnunci.getSelectionModel().getSelectedItem();
-            if (sel == null) {
-                showAlert("Seleziona un Annuncio");
-                return;
-            }
-            openAnnuncioDialog(sel);
-        });
-        btnElimina.setOnAction(e -> {
-            Annuncio sel = tableAnnunci.getSelectionModel().getSelectedItem();
-            if (sel == null) {
-                showAlert("Seleziona un Annuncio");
-                return;
-            }
-            eliminaAnnuncioConferma(sel);
+        // Search
+        tfSearch = styledTextField("Cerca per testo o codice…");
+        tfSearch.textProperty().addListener((obs, o, n) -> {
+            searchDebounce.stop();
+            searchDebounce.setOnFinished(ev -> applyFilters());
+            searchDebounce.playFromStart();
         });
 
-        HBox actions = new HBox(10, btnCrea, btnModifica, btnElimina);
+        Button btnClear = ghostButton("Pulisci", () -> {
+            tfSearch.clear();
+            cbTipologia.setValue("Tutte le tipologie");
+            cbCategoria.setValue(null);
+            applyFilters();
+        });
+
+        filters.getChildren().addAll(cbTipologia, cbCategoria, tfSearch, btnClear);
+        filtersCard.getChildren().add(filters);
+
+        // ===== Card Tabella =====
+        VBox tableCard = card();
+        tableCard.setSpacing(10);
+
+        table = new TableView<>();
+        styleTable(table);
+
+        TableColumn<Annuncio, String> cCod = new TableColumn<>("Codice");
+        cCod.setCellValueFactory(new PropertyValueFactory<>("codiceAnnuncio"));
+        cCod.setPrefWidth(120);
+
+        TableColumn<Annuncio, String> cCat = new TableColumn<>("Categoria");
+        cCat.setCellValueFactory(new PropertyValueFactory<>("categoria"));
+        cCat.setPrefWidth(160);
+
+        TableColumn<Annuncio, String> cTip = new TableColumn<>("Tipologia");
+        cTip.setCellValueFactory(new PropertyValueFactory<>("tipologia"));
+        cTip.setPrefWidth(120);
+
+        TableColumn<Annuncio, String> cDesc = new TableColumn<>("Descrizione");
+        cDesc.setCellValueFactory(new PropertyValueFactory<>("descrizione"));
+        cDesc.setPrefWidth(360);
+        cDesc.setCellFactory(col -> {
+            Label lbl = new Label();
+            lbl.setWrapText(true);
+            lbl.setStyle("-fx-text-fill: #EAF0FF;");
+            TableCell<Annuncio, String> cell = new TableCell<>() {
+                @Override protected void updateItem(String s, boolean empty) {
+                    super.updateItem(s, empty);
+                    setGraphic(empty || s == null ? null : lbl);
+                    if (!empty && s != null) lbl.setText(s);
+                }
+            };
+            cell.setPrefHeight(Region.USE_COMPUTED_SIZE);
+            return cell;
+        });
+
+        TableColumn<Annuncio, Double> cPrice = new TableColumn<>("Prezzo");
+        cPrice.setCellValueFactory(new PropertyValueFactory<>("prezzo"));
+        cPrice.setPrefWidth(120);
+        cPrice.setCellFactory(col -> priceCell());
+
+        TableColumn<Annuncio, String> cState = new TableColumn<>("Stato");
+        cState.setCellValueFactory(new PropertyValueFactory<>("stato"));
+        cState.setPrefWidth(120);
+        cState.setCellFactory(col -> badgeCell());
+
+        table.getColumns().setAll(cCod, cCat, cTip, cDesc, cPrice, cState);
+        table.setPrefHeight(440);
+
+        // Doppio click = Modifica
+        table.setRowFactory(tv -> {
+            TableRow<Annuncio> row = new TableRow<>();
+            row.setOnMouseClicked(ev -> {
+                if (!row.isEmpty() && ev.getButton() == MouseButton.PRIMARY && ev.getClickCount() == 2) {
+                    openDialog(row.getItem());
+                }
+            });
+            // zebra + hover soft (senz'altro codice che interferisca)
+            row.indexProperty().addListener((obs, old, idx) -> {
+                if (!row.isSelected()) row.setStyle(zebraStyle(idx.intValue()));
+            });
+            row.selectedProperty().addListener((o,w,is) -> row.setStyle(is ? "-fx-background-color: #4f8cff;" : zebraStyle(row.getIndex())));
+            row.hoverProperty().addListener((o,w,is) -> {
+                if (!row.isEmpty() && !row.isSelected()) row.setStyle(is ? "-fx-background-color: rgba(255,255,255,0.09);" : zebraStyle(row.getIndex()));
+            });
+            return row;
+        });
+
+        // Context menu
+        MenuItem miNew = new MenuItem("Nuovo");
+        miNew.setOnAction(e -> openDialog(null));
+        MenuItem miEdit = new MenuItem("Modifica");
+        miEdit.setOnAction(e -> { Annuncio a = table.getSelectionModel().getSelectedItem(); if (a!=null) openDialog(a); });
+        MenuItem miDel = new MenuItem("Elimina");
+        miDel.setOnAction(e -> { Annuncio a = table.getSelectionModel().getSelectedItem(); if (a!=null) confirmDelete(a); });
+        table.setContextMenu(new ContextMenu(miNew, miEdit, miDel));
+
+        // Actions bottom (pulite, niente header buttons)
+        HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
+        Button bNew = primaryButton("Crea", () -> openDialog(null));
+        Button bEdit = ghostButton("Modifica", () -> {
+            Annuncio s = table.getSelectionModel().getSelectedItem();
+            if (s == null) { warn("Seleziona un annuncio"); return; }
+            openDialog(s);
+        });
+        Button bDel = ghostButton("Elimina", () -> {
+            Annuncio s = table.getSelectionModel().getSelectedItem();
+            if (s == null) { warn("Seleziona un annuncio"); return; }
+            confirmDelete(s);
+        });
+        actions.getChildren().addAll(bNew, bEdit, bDel);
 
-        root.getChildren().addAll( title, filtriBox, tableAnnunci, actions);
+        // Empty label
+        emptyLabel = new Label("Nessun annuncio corrisponde ai filtri.");
+        emptyLabel.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px;");
+        emptyLabel.setVisible(false);
+        emptyLabel.setManaged(false);
+
+        tableCard.getChildren().addAll(table, emptyLabel, actions);
+
+        root.getChildren().addAll(header, filtersCard, tableCard);
     }
 
-    private void loadAnnunciConFiltri() {
+    // ============================== DATA ==============================
+    private void reloadData() {
         try {
+            masterData.clear();
             List<Annuncio> lista = controller.getAnnunciByUtente(controller.getUtenteCorrente().getMatricola());
-            String categoria = cbCategoria.getEditor().getText().trim();
-            String tipologia = cbTipologia.getValue();
-            String search = tfSearch.getText();
+            masterData.addAll(lista);
 
-            if (!categoria.isBlank()) {
-                lista = lista.stream()
-                        .filter(a -> a.getCategoria().toLowerCase().contains(categoria.toLowerCase()))
-                        .collect(Collectors.toList());
+            // categorie (snapshot ordinato)
+            Set<String> cats = new TreeSet<>();
+            for (Annuncio a : lista) {
+                if (a.getCategoria() != null && !a.getCategoria().isBlank()) cats.add(a.getCategoria());
             }
-            if (tipologia != null && !"Tipologia".equals(tipologia)) {
-                lista = lista.stream()
-                        .filter(a -> a.getTipologia().equalsIgnoreCase(tipologia))
-                        .collect(Collectors.toList());
+            categorie = new ArrayList<>(cats);
+            cbCategoria.getItems().setAll(categorie);
+            cbCategoria.setPromptText("Tutte le categorie");
+            cbCategoria.setValue(null); // “tutte”
+
+            if (filtered == null) {
+                filtered = new FilteredList<>(masterData, a -> true);
+                sorted = new SortedList<>(filtered);
+                sorted.comparatorProperty().bind(table.comparatorProperty());
+                table.setItems(sorted);
+            } else {
+                // già inizializzati: solo refresh items & filtri
+                filtered.setPredicate(null);
             }
-            if (search != null && !search.isBlank()) {
-                String filtro = search.trim().toLowerCase();
-                lista = lista.stream()
-                        .filter(a -> a.getCategoria().toLowerCase().contains(filtro)
-                                || a.getTipologia().toLowerCase().contains(filtro)
-                                || (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(filtro)))
-                        .collect(Collectors.toList());
-            }
-            tableAnnunci.getItems().setAll(lista);
+
+            applyFilters();
         } catch (SQLException e) {
-            showAlert("Errore ricerca annunci: " + e.getMessage());
+            warn("Errore nel caricamento annunci: " + e.getMessage());
         }
     }
 
-    private void eliminaAnnuncioConferma(Annuncio sel) {
-        Alert conf = new Alert(Alert.AlertType.CONFIRMATION, "Vuoi realmente eliminare l'annuncio selezionato?", ButtonType.YES, ButtonType.NO);
-        conf.showAndWait().ifPresent(bt -> {
-            if (bt == ButtonType.YES) {
-                try {
-                    controller.eliminaAnnuncio(sel.getCodiceAnnuncio());
-                    loadAnnunciConFiltri();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                    showAlert("Errore eliminazione: " + e.getMessage());
-                }
+    private void applyFilters() {
+        final String tip = cbTipologia.getValue();
+        final String cat = cbCategoria.getValue();
+        final String query = Optional.ofNullable(tfSearch.getText()).orElse("").trim().toLowerCase();
+
+        Predicate<Annuncio> p = a -> {
+            if (a == null) return false;
+
+            // tipologia
+            if (tip != null && !"Tutte le tipologie".equals(tip)) {
+                if (a.getTipologia()==null || !a.getTipologia().equalsIgnoreCase(tip)) return false;
             }
-        });
+            // categoria
+            if (cat != null && !cat.isBlank()) {
+                if (a.getCategoria()==null || !a.getCategoria().equalsIgnoreCase(cat)) return false;
+            }
+            // text search
+            if (!query.isBlank()) {
+                boolean hit =
+                    (a.getCategoria()!=null && a.getCategoria().toLowerCase().contains(query)) ||
+                    (a.getTipologia()!=null && a.getTipologia().toLowerCase().contains(query)) ||
+                    (a.getDescrizione()!=null && a.getDescrizione().toLowerCase().contains(query)) ||
+                    (a.getCodiceAnnuncio()!=null && a.getCodiceAnnuncio().toLowerCase().contains(query));
+                if (!hit) return false;
+            }
+            return true;
+        };
+
+        filtered.setPredicate(p);
+
+        boolean empty = filtered.isEmpty();
+        emptyLabel.setVisible(empty);
+        emptyLabel.setManaged(empty);
     }
 
-    private void openAnnuncioDialog(Annuncio existing) {
+    // ============================== DIALOG ==============================
+    private void openDialog(Annuncio existing) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle(existing == null ? "Nuovo Annuncio" : "Modifica Annuncio");
+        dialog.setTitle(existing==null ? "Nuovo Annuncio" : "Modifica Annuncio");
+
+        VBox card = card();
+        card.setSpacing(12);
+
         GridPane form = new GridPane();
-        form.setPadding(new Insets(12));
-        form.setHgap(10);
-        form.setVgap(10);
+        form.setHgap(10); form.setVgap(10);
 
-        ComboBox<String> cbCategoria = new ComboBox<>();
-        cbCategoria.setEditable(true);
-        cbCategoria.setPromptText("Categoria");
-        try {
-            Set<String> categorieUsate = controller.getAnnunciAttiviRaw().stream()
-                    .map(a -> a.getCategoria())
-                    .filter(cat -> cat != null && !cat.isBlank())
-                    .collect(Collectors.toSet());
-            cbCategoria.getItems().addAll(categorieUsate);
-        } catch (Exception ignored) {}
-        cbCategoria.setValue(existing == null ? null : existing.getCategoria());
-        cbCategoria.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
-            String input = newVal.toLowerCase();
-            Set<String> catSet = cbCategoria.getItems().stream().collect(Collectors.toSet());
-            try {
-                catSet.addAll(controller.getAnnunciAttiviRaw().stream()
-                        .map(a -> a.getCategoria())
-                        .filter(cat -> cat != null && !cat.isBlank())
-                        .collect(Collectors.toSet()));
-            } catch (Exception ignored) {}
-            List<String> filtered = catSet.stream()
-                    .filter(cat -> cat.toLowerCase().contains(input))
-                    .collect(Collectors.toList());
-            if (!(filtered.size() == cbCategoria.getItems().size() && cbCategoria.getItems().containsAll(filtered)))
-                cbCategoria.getItems().setAll(filtered.isEmpty() ? catSet : filtered);
-        });
+        // Categoria (editabile solo nel dialog)
+        ComboBox<String> catBox = new ComboBox<>();
+        catBox.setEditable(true);
+        catBox.getItems().setAll(categorie);
+        catBox.setValue(existing==null ? null : existing.getCategoria());
+        styleCombo(catBox); styleComboItems(catBox);
 
-        ComboBox<String> cbTipologia = new ComboBox<>();
-        cbTipologia.setPromptText("Tipologia");
-        cbTipologia.getItems().addAll("vendita", "scambio", "regalo");
-        cbTipologia.setValue(existing == null ? null : existing.getTipologia());
-        TextField txtDescrizione = new TextField();
-        txtDescrizione.setText(existing == null ? "" : existing.getDescrizione());
-        TextField txtPrezzo = new TextField();
-        txtPrezzo.setText(existing != null && existing.getPrezzo() != null ? existing.getPrezzo().toString() : "");
-        Label lblPrezzo = new Label("Prezzo:");
-        HBox prezzoBox = new HBox(5, lblPrezzo, txtPrezzo);
+        // Tipologia
+        ComboBox<String> tipBox = new ComboBox<>();
+        tipBox.getItems().addAll("vendita","scambio","regalo");
+        tipBox.setValue(existing==null ? null : existing.getTipologia());
+        styleCombo(tipBox); styleComboItems(tipBox);
+
+        // Descrizione
+        TextField desc = styledTextField("Descrizione");
+        desc.setText(existing!=null ? Optional.ofNullable(existing.getDescrizione()).orElse("") : "");
+
+        // Prezzo (solo vendita)
+        TextField prezzo = styledTextField("Prezzo");
+        applyNumericFormatter(prezzo);
+        if (existing!=null && existing.getPrezzo()!=null) prezzo.setText(existing.getPrezzo().toString());
+
+        HBox prezzoBox = new HBox(6, new Label("Prezzo"), prezzo);
         prezzoBox.setAlignment(Pos.CENTER_LEFT);
+        prezzoBox.setVisible(existing!=null && "vendita".equalsIgnoreCase(existing.getTipologia()));
+        tipBox.setOnAction(e -> prezzoBox.setVisible("vendita".equalsIgnoreCase(tipBox.getValue())));
 
-        ComboBox<String> cbStato = new ComboBox<>();
-        cbStato.getItems().addAll("attivo", "scaduto", "in attesa");
-        cbStato.setValue(existing == null ? null : existing.getStato());
+        // Stato (solo in modifica)
+        ComboBox<String> stateBox = new ComboBox<>();
+        stateBox.getItems().addAll("attivo","scaduto","in attesa");
+        if (existing!=null) stateBox.setValue(existing.getStato());
+        styleCombo(stateBox); styleComboItems(stateBox);
 
-        prezzoBox.setVisible("vendita".equals(cbTipologia.getValue()));
-        cbTipologia.setOnAction(e -> prezzoBox.setVisible("vendita".equals(cbTipologia.getValue())));
+        int r=0;
+        form.add(l("Categoria"),0,r); form.add(catBox,1,r++);
+        form.add(l("Tipologia"),0,r); form.add(tipBox,1,r++);
+        form.add(l("Descrizione"),0,r); form.add(desc,1,r++);
+        form.add(l("Prezzo"),0,r); form.add(prezzoBox,1,r++);
+        if (existing!=null) { form.add(l("Stato"),0,r); form.add(stateBox,1,r++); }
 
-        form.addRow(0, new Label("Categoria:"), cbCategoria);
-        form.addRow(1, new Label("Tipologia:"), cbTipologia);
-        form.addRow(2, new Label("Descrizione:"), txtDescrizione);
-        form.add(prezzoBox, 1, 3);
-
-        if (existing != null) {
-            form.addRow(4, new Label("Stato:"), cbStato);
-        }
-
-        Button btnConferma = new Button(existing == null ? "Crea" : "Aggiorna");
-        btnConferma.setOnAction(e -> {
-            if (!validateForm(cbCategoria, cbTipologia, txtDescrizione, txtPrezzo, cbStato, existing != null)) return;
+        HBox btns = new HBox(10); btns.setAlignment(Pos.CENTER_RIGHT);
+        Button annulla = ghostButton("Annulla", dialog::close);
+        Button conferma = primaryButton(existing==null ? "Crea" : "Aggiorna", () -> {
+            // validazione minima
+            String categoria = Optional.ofNullable(catBox.getEditor().getText()).orElse("").trim();
+            String tip = tipBox.getValue();
+            String d = Optional.ofNullable(desc.getText()).orElse("").trim();
+            if (categoria.isBlank() || tip==null || d.isBlank() || (existing!=null && (stateBox.getValue()==null || stateBox.getValue().isBlank()))) {
+                warn("Compila tutti i campi obbligatori.");
+                return;
+            }
+            double price = 0.0;
+            if ("vendita".equalsIgnoreCase(tip)) {
+                try { price = Double.parseDouble(Optional.ofNullable(prezzo.getText()).orElse("0").replace(",", ".")); }
+                catch (Exception ex) { warn("Prezzo non valido."); return; }
+            }
             try {
                 boolean ok;
-                if (existing == null) {
-                    ok = controller.creaAnnuncio(
-                        cbCategoria.getEditor().getText().trim(),
-                        cbTipologia.getValue(),
-                        txtDescrizione.getText(),
-                        "vendita".equals(cbTipologia.getValue()) ? Double.parseDouble(txtPrezzo.getText()) : 0.0
-                    );
+                if (existing==null) {
+                    ok = controller.creaAnnuncio(categoria, tip, d, price);
                 } else {
-                    ok = controller.modificaAnnuncio(
-                        existing.getCodiceAnnuncio(),
-                        cbCategoria.getEditor().getText().trim(),
-                        cbTipologia.getValue(),
-                        txtDescrizione.getText(),
-                        "vendita".equals(cbTipologia.getValue()) ? Double.parseDouble(txtPrezzo.getText()) : 0.0,
-                        cbStato.getValue()
-                    );
+                    ok = controller.modificaAnnuncio(existing.getCodiceAnnuncio(), categoria, tip, d, price, stateBox.getValue());
                 }
-                if (!ok) {
-                    showAlert("Operazione non riuscita");
-                    return;
-                }
+                if (!ok) { warn("Operazione non riuscita."); return; }
                 dialog.close();
-                loadAnnunciConFiltri();
+                reloadData(); // ricarico in modo pulito
             } catch (SQLException ex) {
-                ex.printStackTrace();
-                showAlert("Errore salvataggio: " + ex.getMessage());
+                warn("Errore salvataggio: " + ex.getMessage());
             }
         });
+        btns.getChildren().addAll(annulla, conferma);
 
-        VBox box = new VBox(12, form, btnConferma);
-        box.setPadding(new Insets(12));
-        dialog.setScene(new Scene(box, 450, existing == null ? 260 : 320));
+        card.getChildren().addAll(form, btns);
+
+        StackPane wrap = new StackPane(card);
+        wrap.setPadding(new Insets(16));
+        wrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
+
+        dialog.setScene(new Scene(wrap, 520, existing==null ? 330 : 390));
         dialog.showAndWait();
     }
 
-    private boolean validateForm(ComboBox<String> cat, ComboBox<String> tip, TextField desc, TextField prezzo, ComboBox<String> stato, boolean isEdit) {
-        String categoria = cat.getEditor().getText().trim();
-        if (categoria.isBlank()
-            || tip.getValue() == null
-            || desc.getText().isBlank()
-            || ("vendita".equals(tip.getValue()) && prezzo.getText().isBlank())
-            || (isEdit && (stato.getValue() == null || stato.getValue().isBlank()))) {
-            showAlert("Compila tutti i campi obbligatori.");
-            return false;
-        }
-        if ("vendita".equals(tip.getValue())) {
-            try {
-                Double.parseDouble(prezzo.getText());
-            } catch (NumberFormatException e) {
-                showAlert("Prezzo non valido.");
-                return false;
+    private void confirmDelete(Annuncio a) {
+        Alert conf = new Alert(Alert.AlertType.CONFIRMATION,
+                "Vuoi eliminare l'annuncio selezionato?", ButtonType.YES, ButtonType.NO);
+        conf.setHeaderText("Elimina annuncio");
+        conf.showAndWait().ifPresent(bt -> {
+            if (bt == ButtonType.YES) {
+                try {
+                    controller.eliminaAnnuncio(a.getCodiceAnnuncio());
+                    reloadData();
+                } catch (SQLException e) {
+                    warn("Errore eliminazione: " + e.getMessage());
+                }
             }
+        });
+    }
+
+    // ============================== Helpers UI ==============================
+    private VBox card() {
+        VBox card = new VBox();
+        card.setPadding(new Insets(16));
+        card.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.06);" +
+            "-fx-background-radius: 18;" +
+            "-fx-border-radius: 18;" +
+            "-fx-border-color: rgba(255,255,255,0.10);" +
+            "-fx-border-width: 1;"
+        );
+        card.setEffect(new DropShadow(24, Color.color(0,0,0,0.45)));
+        return card;
+    }
+    private Label l(String s) {
+        Label lbl = new Label(s);
+        lbl.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px; -fx-font-weight: 800;");
+        return lbl;
+    }
+    private TextField styledTextField(String prompt) {
+        TextField tf = new TextField();
+        tf.setPromptText(prompt);
+        tf.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.10);" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 12;" +
+            "-fx-prompt-text-fill: rgba(234,240,255,0.45);" +
+            "-fx-border-color: transparent;"
+        );
+        return tf;
+    }
+    private void styleCombo(ComboBox<?> cb) {
+        cb.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.10);" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 2 4;" +
+            "-fx-border-color: transparent;"
+        );
+        if (cb.getEditor()!=null) {
+            cb.getEditor().setStyle(
+                "-fx-background-color: transparent;" +
+                "-fx-text-fill: #EAF0FF;" +
+                "-fx-prompt-text-fill: rgba(234,240,255,0.45);"
+            );
         }
-        return true;
+    }
+    private <T> void styleComboItems(ComboBox<T> combo) {
+        combo.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(T item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item==null ? null : String.valueOf(item));
+                setStyle(empty ? "" : "-fx-text-fill: #EAF0FF; -fx-background-color: transparent;");
+            }
+        });
+        combo.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(T item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item==null ? (combo.getPromptText()==null? "" : combo.getPromptText()) : String.valueOf(item));
+                setStyle("-fx-text-fill: #EAF0FF; -fx-background-color: transparent;");
+            }
+        });
+    }
+    private Button primaryButton(String text, Runnable action) {
+        Button b = new Button(text);
+        b.setOnAction(e -> action.run());
+        b.setStyle(
+            "-fx-background-color: #4f8cff;" +
+            "-fx-text-fill: white;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-weight: 700;"
+        );
+        b.setOnMouseEntered(e -> b.setStyle(
+            "-fx-background-color: #3b6fe0; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        b.setOnMouseExited(e -> b.setStyle(
+            "-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        return b;
+    }
+    private Button ghostButton(String text, Runnable action) {
+        Button b = new Button(text);
+        b.setOnAction(e -> action.run());
+        b.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-border-color: rgba(255,255,255,0.20);" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-weight: 700;"
+        );
+        b.setOnMouseEntered(e -> b.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.08);" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-border-color: rgba(255,255,255,0.20);" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        b.setOnMouseExited(e -> b.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-border-color: rgba(255,255,255,0.20);" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16; -fx-font-weight: 700;"
+        ));
+        return b;
+    }
+    private void styleTable(TableView<?> tv) {
+        tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        tv.setStyle(
+            "-fx-background-color: transparent;" +
+            "-fx-control-inner-background: rgba(255,255,255,0.04);" +
+            "-fx-background-insets: 0;" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-selection-bar: #4f8cff;" +
+            "-fx-selection-bar-text: white;" +
+            "-fx-selection-bar-non-focused: #3b6fe0;"
+        );
+    }
+    private TableCell<Annuncio, Double> priceCell() {
+        DecimalFormatSymbols s = new DecimalFormatSymbols(Locale.ITALY);
+        s.setDecimalSeparator(',');
+        s.setGroupingSeparator('.');
+        DecimalFormat df = new DecimalFormat("#,##0.00", s);
+        return new TableCell<>() {
+            @Override protected void updateItem(Double value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(empty || value == null ? null : df.format(value));
+                setStyle("-fx-text-fill: #EAF0FF; -fx-alignment: CENTER_RIGHT; -fx-padding: 0 10 0 0;");
+            }
+        };
+    }
+    private TableCell<Annuncio, String> badgeCell() {
+        return new TableCell<>() {
+            @Override protected void updateItem(String stato, boolean empty) {
+                super.updateItem(stato, empty);
+                if (empty || stato == null) { setGraphic(null); setText(null); return; }
+                Label badge = new Label(stato.toUpperCase());
+                String bg = switch (stato.toLowerCase()) {
+                    case "attivo" -> "rgba(122,247,195,0.25)";
+                    case "scaduto" -> "rgba(255,107,107,0.25)";
+                    default -> "rgba(255,255,255,0.18)";
+                };
+                String color = switch (stato.toLowerCase()) {
+                    case "attivo" -> "#7af7c3";
+                    case "scaduto" -> "#ff6b6b";
+                    default -> "#EAF0FF";
+                };
+                badge.setStyle(
+                    "-fx-text-fill: " + color + ";" +
+                    "-fx-font-size: 11px;" +
+                    "-fx-font-weight: 800;" +
+                    "-fx-background-color: " + bg + ";" +
+                    "-fx-background-radius: 999;" +
+                    "-fx-padding: 4 8;"
+                );
+                setGraphic(badge);
+                setAlignment(Pos.CENTER);
+            }
+        };
+    }
+    private String zebraStyle(int index) {
+        if (index < 0) return "-fx-background-color: rgba(255,255,255,0.04);";
+        return (index % 2 == 0)
+                ? "-fx-background-color: rgba(255,255,255,0.04);"
+                : "-fx-background-color: rgba(255,255,255,0.07);";
+    }
+    private void applyNumericFormatter(TextField tf) {
+        UnaryOperator<TextFormatter.Change> filter = change -> {
+            String newText = change.getControlNewText();
+            if (newText.isEmpty()) return change;
+            return newText.matches("\\d*[\\.,]?\\d*") ? change : null;
+        };
+        StringConverter<Double> conv = new DoubleStringConverter() {
+            @Override public Double fromString(String s) {
+                if (s == null || s.isBlank()) return null;
+                return Double.valueOf(s.replace(",", "."));
+            }
+        };
+        tf.setTextFormatter(new TextFormatter<>(conv, null, filter));
+    }
+    private void warn(String msg) {
+        Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
+        a.setHeaderText(null);
+        a.showAndWait();
     }
 
-    private void showAlert(String msg) {
-        new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK).showAndWait();
-    }
-
-    public VBox getRoot() {
-        return root;
-    }
+    public VBox getRoot() { return root; }
 }
