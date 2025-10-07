@@ -128,23 +128,16 @@ public class HomePageView {
             e.printStackTrace();
         }
 
-        Button btnReport = new Button("Statistiche & Report");
-        btnReport.setOnAction(e -> {
-            ReportView reportView = new ReportView(controller);
-            Node newContent = reportView.getRoot();
-            root.getChildren().set(1, newContent);
-            HBox.setHgrow(newContent, Priority.ALWAYS);
-        });
-
+        // --- Non aggiungere più btnReport qui! ---
         bottomBox.getChildren().addAll(
                 statBox("Annunci", String.valueOf(totAnnunci)),
                 statBox("Offerte", String.valueOf(totOfferte)),
                 statBox("Oggetti", String.valueOf(totOggetti)),
-                statBox("Annunci Personali", String.valueOf(totAnnunciPersonali)),
-                btnReport
+                statBox("Annunci Personali", String.valueOf(totAnnunciPersonali))
         );
 
         contentArea.getChildren().addAll(welcomeLabel, centerBox, bottomBox);
+
         return contentArea;
     }
 
