@@ -24,24 +24,17 @@ public class AnnunciView {
     private ComboBox<String> cbCategoria;
     private ComboBox<String> cbTipologia;
     private TextField tfSearch;
+    private Set<String> categorieGlobali;
 
     public AnnunciView(Controller controller) {
         this.controller = controller;
         createUI();
-        loadAnnunci();
+        loadAnnunciConFiltri();
     }
 
     private void createUI() {
         root = new VBox(10);
         root.setPadding(new Insets(12));
-
-        Button btnHome = new Button("⌂");
-        btnHome.setOnAction(e -> {
-            // Sostituisci con la logica per tornare alla home
-            System.out.println("Torna alla home!");
-        });
-        HBox topBar = new HBox(btnHome);
-        topBar.setAlignment(Pos.CENTER_LEFT);
 
         Label title = new Label("I miei Annunci");
         title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
@@ -50,22 +43,34 @@ public class AnnunciView {
         HBox filtriBox = new HBox(10);
         filtriBox.setAlignment(Pos.CENTER_LEFT);
 
-        cbCategoria = new ComboBox<>();
-        cbCategoria.getItems().add("Categoria");
-        cbCategoria.setValue("Categoria");
+        // ComboBox categoria editabile come OggettiView
         try {
-            Set<String> categorie = controller.getAnnunciAttiviRaw().stream()
-                    .map(a -> a.getCategoria())
-                    .filter(cat -> cat != null && !cat.isBlank())
-                    .collect(Collectors.toSet());
-            cbCategoria.getItems().addAll(categorie);
-        } catch (Exception ignored) {}
-        cbCategoria.setOnAction(e -> loadAnnunciConFiltri());
+            categorieGlobali = controller.getAnnunciAttiviRaw().stream()
+                .map(a -> a.getCategoria())
+                .filter(cat -> cat != null && !cat.isBlank())
+                .collect(Collectors.toSet());
+        } catch (Exception ignored) {
+            categorieGlobali = Set.of();
+        }
+
+        cbCategoria = new ComboBox<>();
+        cbCategoria.setEditable(true);
+        cbCategoria.setPromptText("Categoria");
+        cbCategoria.getItems().addAll(categorieGlobali);
+        // Live filter
+        cbCategoria.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+            String input = newVal.toLowerCase();
+            List<String> filtered = categorieGlobali.stream()
+                    .filter(cat -> cat.toLowerCase().contains(input))
+                    .collect(Collectors.toList());
+            if (!(filtered.size() == cbCategoria.getItems().size() && cbCategoria.getItems().containsAll(filtered)))
+                cbCategoria.getItems().setAll(filtered.isEmpty() ? categorieGlobali : filtered);
+            loadAnnunciConFiltri();
+        });
 
         cbTipologia = new ComboBox<>();
-        cbTipologia.getItems().add("Tipologia");
+        cbTipologia.setPromptText("Tipologia");
         cbTipologia.getItems().addAll("vendita", "scambio", "regalo");
-        cbTipologia.setValue("Tipologia");
         cbTipologia.setOnAction(e -> loadAnnunciConFiltri());
 
         tfSearch = new TextField();
@@ -114,18 +119,19 @@ public class AnnunciView {
         HBox actions = new HBox(10, btnCrea, btnModifica, btnElimina);
         actions.setAlignment(Pos.CENTER_LEFT);
 
-        root.getChildren().addAll(topBar, title, filtriBox, tableAnnunci, actions);
+        root.getChildren().addAll( title, filtriBox, tableAnnunci, actions);
     }
+
     private void loadAnnunciConFiltri() {
         try {
             List<Annuncio> lista = controller.getAnnunciByUtente(controller.getUtenteCorrente().getMatricola());
-            String categoria = cbCategoria.getValue();
+            String categoria = cbCategoria.getEditor().getText().trim();
             String tipologia = cbTipologia.getValue();
             String search = tfSearch.getText();
 
-            if (categoria != null && !"Categoria".equals(categoria)) {
+            if (!categoria.isBlank()) {
                 lista = lista.stream()
-                        .filter(a -> a.getCategoria().equalsIgnoreCase(categoria))
+                        .filter(a -> a.getCategoria().toLowerCase().contains(categoria.toLowerCase()))
                         .collect(Collectors.toList());
             }
             if (tipologia != null && !"Tipologia".equals(tipologia)) {
@@ -147,44 +153,13 @@ public class AnnunciView {
         }
     }
 
-
-    private void loadAnnunci() {
-        try {
-            List<Annuncio> annunci = controller.getAnnunciByUtente(controller.getUtenteCorrente().getMatricola());
-            tableAnnunci.getItems().setAll(annunci);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            showAlert("Errore caricamento annunci: " + e.getMessage());
-        }
-    }
-
-    // Ricerca/filter live
-    private void filtraAnnunci(String filtroInput) {
-        String filtro = filtroInput.trim().toLowerCase();
-        try {
-            List<Annuncio> tutti = controller.getAnnunciByUtente(controller.getUtenteCorrente().getMatricola());
-            if (!filtro.isBlank()) {
-                tutti = tutti.stream()
-                        .filter(a -> a.getCategoria().toLowerCase().contains(filtro)
-                                || a.getTipologia().toLowerCase().contains(filtro)
-                                || (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(filtro)))
-                        .collect(Collectors.toList());
-            }
-            tableAnnunci.getItems().setAll(tutti);
-        } catch (SQLException e) {
-            showAlert("Errore ricerca annunci: " + e.getMessage());
-        }
-    }
-
-
-    // Alert di conferma per elimina
     private void eliminaAnnuncioConferma(Annuncio sel) {
         Alert conf = new Alert(Alert.AlertType.CONFIRMATION, "Vuoi realmente eliminare l'annuncio selezionato?", ButtonType.YES, ButtonType.NO);
         conf.showAndWait().ifPresent(bt -> {
             if (bt == ButtonType.YES) {
                 try {
                     controller.eliminaAnnuncio(sel.getCodiceAnnuncio());
-                    loadAnnunci();
+                    loadAnnunciConFiltri();
                 } catch (SQLException e) {
                     e.printStackTrace();
                     showAlert("Errore eliminazione: " + e.getMessage());
@@ -203,6 +178,7 @@ public class AnnunciView {
         form.setVgap(10);
 
         ComboBox<String> cbCategoria = new ComboBox<>();
+        cbCategoria.setEditable(true);
         cbCategoria.setPromptText("Categoria");
         try {
             Set<String> categorieUsate = controller.getAnnunciAttiviRaw().stream()
@@ -211,25 +187,38 @@ public class AnnunciView {
                     .collect(Collectors.toSet());
             cbCategoria.getItems().addAll(categorieUsate);
         } catch (Exception ignored) {}
+        cbCategoria.setValue(existing == null ? null : existing.getCategoria());
+        cbCategoria.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+            String input = newVal.toLowerCase();
+            Set<String> catSet = cbCategoria.getItems().stream().collect(Collectors.toSet());
+            try {
+                catSet.addAll(controller.getAnnunciAttiviRaw().stream()
+                        .map(a -> a.getCategoria())
+                        .filter(cat -> cat != null && !cat.isBlank())
+                        .collect(Collectors.toSet()));
+            } catch (Exception ignored) {}
+            List<String> filtered = catSet.stream()
+                    .filter(cat -> cat.toLowerCase().contains(input))
+                    .collect(Collectors.toList());
+            if (!(filtered.size() == cbCategoria.getItems().size() && cbCategoria.getItems().containsAll(filtered)))
+                cbCategoria.getItems().setAll(filtered.isEmpty() ? catSet : filtered);
+        });
 
         ComboBox<String> cbTipologia = new ComboBox<>();
+        cbTipologia.setPromptText("Tipologia");
         cbTipologia.getItems().addAll("vendita", "scambio", "regalo");
+        cbTipologia.setValue(existing == null ? null : existing.getTipologia());
         TextField txtDescrizione = new TextField();
+        txtDescrizione.setText(existing == null ? "" : existing.getDescrizione());
         TextField txtPrezzo = new TextField();
+        txtPrezzo.setText(existing != null && existing.getPrezzo() != null ? existing.getPrezzo().toString() : "");
         Label lblPrezzo = new Label("Prezzo:");
         HBox prezzoBox = new HBox(5, lblPrezzo, txtPrezzo);
         prezzoBox.setAlignment(Pos.CENTER_LEFT);
 
         ComboBox<String> cbStato = new ComboBox<>();
         cbStato.getItems().addAll("attivo", "scaduto", "in attesa");
-
-        if (existing != null) {
-            cbCategoria.setValue(existing.getCategoria());
-            cbTipologia.setValue(existing.getTipologia());
-            txtDescrizione.setText(existing.getDescrizione());
-            txtPrezzo.setText(existing.getPrezzo() != null ? existing.getPrezzo().toString() : "");
-            cbStato.setValue(existing.getStato());
-        }
+        cbStato.setValue(existing == null ? null : existing.getStato());
 
         prezzoBox.setVisible("vendita".equals(cbTipologia.getValue()));
         cbTipologia.setOnAction(e -> prezzoBox.setVisible("vendita".equals(cbTipologia.getValue())));
@@ -250,7 +239,7 @@ public class AnnunciView {
                 boolean ok;
                 if (existing == null) {
                     ok = controller.creaAnnuncio(
-                        cbCategoria.getValue(),
+                        cbCategoria.getEditor().getText().trim(),
                         cbTipologia.getValue(),
                         txtDescrizione.getText(),
                         "vendita".equals(cbTipologia.getValue()) ? Double.parseDouble(txtPrezzo.getText()) : 0.0
@@ -258,7 +247,7 @@ public class AnnunciView {
                 } else {
                     ok = controller.modificaAnnuncio(
                         existing.getCodiceAnnuncio(),
-                        cbCategoria.getValue(),
+                        cbCategoria.getEditor().getText().trim(),
                         cbTipologia.getValue(),
                         txtDescrizione.getText(),
                         "vendita".equals(cbTipologia.getValue()) ? Double.parseDouble(txtPrezzo.getText()) : 0.0,
@@ -270,7 +259,7 @@ public class AnnunciView {
                     return;
                 }
                 dialog.close();
-                loadAnnunci();
+                loadAnnunciConFiltri();
             } catch (SQLException ex) {
                 ex.printStackTrace();
                 showAlert("Errore salvataggio: " + ex.getMessage());
@@ -284,11 +273,12 @@ public class AnnunciView {
     }
 
     private boolean validateForm(ComboBox<String> cat, ComboBox<String> tip, TextField desc, TextField prezzo, ComboBox<String> stato, boolean isEdit) {
-        if (cat.getValue() == null || cat.getValue().isBlank()
+        String categoria = cat.getEditor().getText().trim();
+        if (categoria.isBlank()
             || tip.getValue() == null
             || desc.getText().isBlank()
             || ("vendita".equals(tip.getValue()) && prezzo.getText().isBlank())
-            || (isEdit && stato.getValue() == null)) {
+            || (isEdit && (stato.getValue() == null || stato.getValue().isBlank()))) {
             showAlert("Compila tutti i campi obbligatori.");
             return false;
         }

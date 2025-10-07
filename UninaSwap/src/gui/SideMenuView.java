@@ -19,6 +19,10 @@ public class SideMenuView {
     private VBox annunciSubmenu;
     private boolean annunciExpanded = false;
     
+ // Sezione Offerte
+    private Button btnOfferteHeader;
+    private VBox offerteSubmenu;
+    private boolean offerteExpanded = false;
     // Nuovo: pulsante home
     private Button btnHome;
 
@@ -52,7 +56,7 @@ public class SideMenuView {
         btnAnnunciHeader.setOnAction(e -> toggleAnnunciSubmenu());
 
         // Submenu annunci
-        Button btnGestisciAnnunci = new Button("Gestisci Annunci");
+        Button btnGestisciAnnunci = new Button("I miei Annunci");
         Button btnListaAnnunci = new Button("Lista Annunci");
         styleSubmenuButton(btnGestisciAnnunci);
         styleSubmenuButton(btnListaAnnunci);
@@ -66,16 +70,37 @@ public class SideMenuView {
         annunciSubmenu.setManaged(false);
 
         // Altre voci esempio
-        Button btnGestioneOfferte = new Button("Gestione Offerte");
+     // Header "Offerte" con freccia
+        btnOfferteHeader = new Button("Offerte ▶");
+        styleMenuButton(btnOfferteHeader);
+        btnOfferteHeader.setOnAction(e -> toggleOfferteSubmenu());
+
+        // Submenu offerte
+        Button btnOfferteInviate = new Button("Offerte Inviate");
+        Button btnOfferteRicevute = new Button("Offerte Ricevute");
+        styleSubmenuButton(btnOfferteInviate);
+        styleSubmenuButton(btnOfferteRicevute);
+
+        btnOfferteInviate.setOnAction(e -> notifyMenuSelection("offerte_inviate"));
+        btnOfferteRicevute.setOnAction(e -> notifyMenuSelection("offerte_ricevute"));
+
+        offerteSubmenu = new VBox(6, btnOfferteInviate, btnOfferteRicevute);
+        offerteSubmenu.setPadding(new Insets(0, 0, 0, 16));
+        offerteSubmenu.setVisible(false);
+        offerteSubmenu.setManaged(false);
         Button btnStatistiche = new Button("Statistiche");
-        styleMenuButton(btnGestioneOfferte);
         styleMenuButton(btnStatistiche);
-        btnGestioneOfferte.setOnAction(e -> notifyMenuSelection("offerte"));
         btnStatistiche.setOnAction(e -> notifyMenuSelection("statistiche"));
 
         // Inserimento del nuovo pulsante home DOPO il toggleButton
-        menuBox.getChildren().addAll(toggleButton, btnHome, btnAnnunciHeader, annunciSubmenu, btnOggetti, btnGestioneOfferte, btnStatistiche);
-    }
+        menuBox.getChildren().addAll(
+        	    toggleButton, 
+        	    btnHome, 
+        	    btnAnnunciHeader, annunciSubmenu,
+        	    btnOfferteHeader, offerteSubmenu,
+        	    btnOggetti, 
+        	    btnStatistiche
+        	);    }
 
     private void styleMenuButton(Button btn) {
         btn.setMaxWidth(Double.MAX_VALUE);
@@ -97,7 +122,12 @@ public class SideMenuView {
         annunciSubmenu.setManaged(annunciExpanded);
         btnAnnunciHeader.setText(annunciExpanded ? "Annunci ▼" : "Annunci ▶");
     }
-
+    private void toggleOfferteSubmenu() {
+        offerteExpanded = !offerteExpanded;
+        offerteSubmenu.setVisible(offerteExpanded);
+        offerteSubmenu.setManaged(offerteExpanded);
+        btnOfferteHeader.setText(offerteExpanded ? "Offerte ▼" : "Offerte ▶");
+    }
     private void toggleMenu() {
         if (isVisible) {
             menuBox.setPrefWidth(40);

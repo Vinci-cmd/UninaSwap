@@ -23,6 +23,7 @@ public class OggettiView {
     private ComboBox<String> cbCategoria;
     private ComboBox<String> cbAnnuncio;
     private TextField tfSearch;
+    private Set<String> categorieGlobali;
 
     public OggettiView(Controller controller) {
         this.controller = controller;
@@ -37,26 +38,37 @@ public class OggettiView {
         Label lblTitolo = new Label("Gestione Oggetti Personali");
         lblTitolo.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
 
-        // -- FILTRI AVANZATI --
+        // --- FILTRI AVANZATI ---
         HBox filtriBox = new HBox(10);
         filtriBox.setAlignment(Pos.CENTER_LEFT);
 
-        cbCategoria = new ComboBox<>();
-        cbCategoria.setEditable(true); // Permette sia selezione che creazione nuova categoria
-        cbCategoria.getItems().add("Categoria");
-        cbCategoria.setValue("Categoria");
         try {
-            Set<String> categorie = controller.getAnnunciAttiviRaw().stream()
+            categorieGlobali = controller.getAnnunciAttiviRaw().stream()
                     .map(a -> a.getCategoria())
                     .filter(cat -> cat != null && !cat.isBlank())
                     .collect(Collectors.toSet());
-            cbCategoria.getItems().addAll(categorie);
-        } catch (Exception ignored) {}
-        cbCategoria.setOnAction(e -> loadOggettiConFiltri());
+        } catch (Exception ignored) {
+            categorieGlobali = Set.of();
+        }
+
+        cbCategoria = new ComboBox<>();
+        cbCategoria.setEditable(true);
+        cbCategoria.getItems().addAll(categorieGlobali); // Nessun "Categoria" tra le voci reali!
+        cbCategoria.setPromptText("Categoria");
+        // Filtro interattivo live
+        cbCategoria.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+            String input = newVal.toLowerCase();
+            List<String> filtered = categorieGlobali.stream()
+                    .filter(cat -> cat.toLowerCase().contains(input))
+                    .collect(Collectors.toList());
+            if (!(filtered.size() == cbCategoria.getItems().size() && cbCategoria.getItems().containsAll(filtered)))
+                cbCategoria.getItems().setAll(filtered.isEmpty() ? categorieGlobali : filtered);
+            // AGGIUNGI QUESTA RIGA per filtro live tabella:
+            loadOggettiConFiltri();
+        });
 
         cbAnnuncio = new ComboBox<>();
-        cbAnnuncio.getItems().add("Associazione");
-        cbAnnuncio.getItems().addAll("Non associato", "Associato");
+        cbAnnuncio.getItems().addAll("Associazione", "Non associato", "Associato");
         cbAnnuncio.setValue("Associazione");
         cbAnnuncio.setOnAction(e -> loadOggettiConFiltri());
 
@@ -66,7 +78,7 @@ public class OggettiView {
 
         filtriBox.getChildren().addAll(cbCategoria, cbAnnuncio, tfSearch);
 
-        // -- TABELLA OGGETTI --
+        // --- TABELLA OGGETTI ---
         tableOggetti = new TableView<>();
         TableColumn<Oggetto, String> colCodice = new TableColumn<>("Codice");
         colCodice.setCellValueFactory(new PropertyValueFactory<>("codiceOggetto"));
@@ -74,7 +86,6 @@ public class OggettiView {
         colNome.setCellValueFactory(new PropertyValueFactory<>("nome"));
         TableColumn<Oggetto, String> colDescr = new TableColumn<>("Descrizione");
         colDescr.setCellValueFactory(new PropertyValueFactory<>("descrizione"));
-
         tableOggetti.getColumns().addAll(colCodice, colNome, colDescr);
         tableOggetti.setPrefHeight(250);
 
@@ -90,15 +101,13 @@ public class OggettiView {
             return row;
         });
 
-        // BOX pulsanti
+        // --- BOX PULSANTI ---
         HBox btnBox = new HBox(8);
         btnBox.setAlignment(Pos.CENTER_LEFT);
 
         Button btnAggiungi = new Button("Aggiungi");
         Button btnModifica = new Button("Modifica");
         Button btnElimina = new Button("Elimina");
-
-        btnBox.getChildren().addAll(btnAggiungi, btnModifica, btnElimina);
 
         btnAggiungi.setOnAction(e -> openOggettoDialog(null));
         btnModifica.setOnAction(e -> {
@@ -121,9 +130,9 @@ public class OggettiView {
             } else showAlert("Seleziona un oggetto da eliminare!");
         });
 
+        btnBox.getChildren().addAll(btnAggiungi, btnModifica, btnElimina);
         root.getChildren().addAll(lblTitolo, filtriBox, tableOggetti, btnBox);
     }
-
 
     private void loadOggettiConFiltri() {
         try {
@@ -134,20 +143,19 @@ public class OggettiView {
             String search = tfSearch.getText();
             String associazione = cbAnnuncio.getValue();
 
-            // FILTRA CATEGORIA
-            if (!categoria.isBlank() && !"Categoria".equals(categoria)) {
+            if (!categoria.isBlank()) {
                 lista = lista.stream()
-                        .filter(o -> o.getCategoria().equalsIgnoreCase(categoria))
+                        .filter(o -> o.getCategoria().toLowerCase().contains(categoria.toLowerCase()))
                         .collect(Collectors.toList());
             }
-            // FILTRA ASSOCIAZIONE
+
             if (associazione != null && !"Associazione".equals(associazione)) {
                 if ("Non associato".equals(associazione))
                     lista = lista.stream().filter(o -> o.getCodiceAnnuncio() == null).collect(Collectors.toList());
                 else
                     lista = lista.stream().filter(o -> o.getCodiceAnnuncio() != null).collect(Collectors.toList());
             }
-            // FILTRA PER TESTO
+
             if (search != null && !search.isBlank()) {
                 String filtro = search.trim().toLowerCase();
                 lista = lista.stream()
@@ -156,13 +164,13 @@ public class OggettiView {
                               || o.getDescrizione().toLowerCase().contains(filtro))
                         .collect(Collectors.toList());
             }
+
             tableOggetti.getItems().setAll(lista);
         } catch (SQLException e) {
             showAlert("Errore caricamento oggetti: " + e.getMessage());
         }
     }
 
-    // Conferma azioni
     private boolean conferma(String messaggio) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION, messaggio, ButtonType.YES, ButtonType.NO);
         alert.setHeaderText(null);
@@ -170,7 +178,6 @@ public class OggettiView {
         return alert.getResult() == ButtonType.YES;
     }
 
-    // DIALOG DETTAGLIO/AGGIUNTA
     private void openOggettoDialog(Oggetto oggetto) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -180,7 +187,6 @@ public class OggettiView {
         box.setPadding(new Insets(16));
 
         if (oggetto == null) {
-            // Dialog AGGIUNTA NUOVO
             TextField tfNome = new TextField();
             tfNome.setPromptText("Nome");
             TextArea taDescrizione = new TextArea();
@@ -190,17 +196,19 @@ public class OggettiView {
             ComboBox<String> cbCategoriaDialog = new ComboBox<>();
             cbCategoriaDialog.setEditable(true);
             cbCategoriaDialog.setPromptText("Categoria");
-            try {
-                Set<String> categorieUsate = controller.getAnnunciAttiviRaw().stream()
-                        .map(a -> a.getCategoria())
-                        .filter(cat -> cat != null && !cat.isBlank())
-                        .collect(Collectors.toSet());
-                cbCategoriaDialog.getItems().addAll(categorieUsate);
-            } catch (Exception ignored) {}
+            cbCategoriaDialog.getItems().addAll(categorieGlobali);
+            cbCategoriaDialog.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+                String input = newVal.toLowerCase();
+                List<String> filtered = categorieGlobali.stream()
+                        .filter(cat -> cat.toLowerCase().contains(input))
+                        .collect(Collectors.toList());
+                if (!(filtered.size() == cbCategoriaDialog.getItems().size()
+                        && cbCategoriaDialog.getItems().containsAll(filtered)))
+                    cbCategoriaDialog.getItems().setAll(filtered.isEmpty() ? categorieGlobali : filtered);
+            });
 
             Button btnSalva = new Button("Salva");
             btnSalva.setDefaultButton(true);
-
             btnSalva.setOnAction(e -> {
                 String nome = tfNome.getText().trim();
                 String descr = taDescrizione.getText().trim();
@@ -226,7 +234,6 @@ public class OggettiView {
                     btnSalva
             );
         } else {
-            // Solo dettaglio + eventualmente annulla associazione
             Label lblNome = new Label("Nome: " + oggetto.getNome());
             Label lblDescr = new Label("Descrizione: " + oggetto.getDescrizione());
             Label lblCategoria = new Label("Categoria: " + oggetto.getCategoria());
@@ -256,7 +263,6 @@ public class OggettiView {
         dialog.showAndWait();
     }
 
-    // MODIFICA
     private void dialogModificaOggetto(Oggetto oggetto) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -274,18 +280,20 @@ public class OggettiView {
         ComboBox<String> cbCategoriaDialog = new ComboBox<>();
         cbCategoriaDialog.setEditable(true);
         cbCategoriaDialog.setPromptText("Categoria");
-        try {
-            Set<String> categorieUsate = controller.getAnnunciAttiviRaw().stream()
-                    .map(a -> a.getCategoria())
-                    .filter(cat -> cat != null && !cat.isBlank())
-                    .collect(Collectors.toSet());
-            cbCategoriaDialog.getItems().addAll(categorieUsate);
-            cbCategoriaDialog.setValue(oggetto.getCategoria());
-        } catch (Exception ignored) {}
+        cbCategoriaDialog.getItems().addAll(categorieGlobali);
+        cbCategoriaDialog.setValue(oggetto.getCategoria());
+        cbCategoriaDialog.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+            String input = newVal.toLowerCase();
+            List<String> filtered = categorieGlobali.stream()
+                    .filter(cat -> cat.toLowerCase().contains(input))
+                    .collect(Collectors.toList());
+            if (!(filtered.size() == cbCategoriaDialog.getItems().size()
+                    && cbCategoriaDialog.getItems().containsAll(filtered)))
+                cbCategoriaDialog.getItems().setAll(filtered.isEmpty() ? categorieGlobali : filtered);
+        });
 
         Button btnSalva = new Button("Salva Modifiche");
         btnSalva.setDefaultButton(true);
-
         btnSalva.setOnAction(e -> {
             String nome = tfNome.getText().trim();
             String descr = taDescrizione.getText().trim();
@@ -319,6 +327,7 @@ public class OggettiView {
     private void showAlert(String msg) {
         new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK).showAndWait();
     }
+
     public VBox getRoot() {
         return root;
     }

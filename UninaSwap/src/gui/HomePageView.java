@@ -56,19 +56,26 @@ public class HomePageView {
                     HBox.setHgrow(newContent, Priority.ALWAYS);
                     break;
                 }
-                case "offerte": {
-                    VBox offertaBox = new VBox(new Label("Gestione Offerte - da implementare"));
-                    offertaBox.setAlignment(Pos.CENTER);
-                    offertaBox.setPrefWidth(700);
-                    Node newContent = offertaBox;
-                    root.getChildren().set(1, newContent);
-                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                case "offerte_inviate": {
+                    VBox inviateBox = new VBox(new Label("Qui apparirà la pagina Offerte Inviate"));
+                    inviateBox.setAlignment(Pos.CENTER);
+                    inviateBox.setPrefWidth(700);
+                    Node contentInv = inviateBox;
+                    root.getChildren().set(1, contentInv);
+                    HBox.setHgrow(contentInv, Priority.ALWAYS);
                     break;
                 }
-                case "oggetti":
-                    OggettiView oggettiView = new OggettiView(controller);
-                    root.getChildren().set(1, oggettiView.getRoot());
+                case "offerte_ricevute": {
+                    VBox ricevuteBox = new VBox(new Label("Qui apparirà la pagina Offerte Ricevute"));
+                    ricevuteBox.setAlignment(Pos.CENTER);
+                    ricevuteBox.setPrefWidth(700);
+                    Node contentRcv = ricevuteBox;
+                    root.getChildren().set(1, contentRcv);
+                    HBox.setHgrow(contentRcv, Priority.ALWAYS);
                     break;
+                }
+
+                // ...altri casi come già presenti
                 case "statistiche": {
                     // integra il ReportView nel pannello centrale
                     ReportView reportView = new ReportView(controller);
@@ -108,7 +115,7 @@ public class HomePageView {
         centerBox.getChildren().addAll(notifLabel, notifList);
         centerBox.setAlignment(Pos.CENTER);
 
-        // statistiche rapide + bottone report
+        // statistiche rapide senza bottone report
         HBox bottomBox = new HBox(30);
         bottomBox.setPadding(new Insets(15));
         bottomBox.setAlignment(Pos.CENTER);
@@ -128,20 +135,11 @@ public class HomePageView {
             e.printStackTrace();
         }
 
-        Button btnReport = new Button("Statistiche & Report");
-        btnReport.setOnAction(e -> {
-            ReportView reportView = new ReportView(controller);
-            Node newContent = reportView.getRoot();
-            root.getChildren().set(1, newContent);
-            HBox.setHgrow(newContent, Priority.ALWAYS);
-        });
-
         bottomBox.getChildren().addAll(
                 statBox("Annunci", String.valueOf(totAnnunci)),
                 statBox("Offerte", String.valueOf(totOfferte)),
                 statBox("Oggetti", String.valueOf(totOggetti)),
-                statBox("Annunci Personali", String.valueOf(totAnnunciPersonali)),
-                btnReport
+                statBox("Annunci Personali", String.valueOf(totAnnunciPersonali))
         );
 
         contentArea.getChildren().addAll(welcomeLabel, centerBox, bottomBox);
