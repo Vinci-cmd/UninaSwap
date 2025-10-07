@@ -39,10 +39,8 @@ public class HomePageView {
                     root.getChildren().set(1, annunciView.getRoot());
                     break;
                 case "annunci_lista":
-                    VBox listaBox = new VBox(new Label("Lista Annunci Pubblici - da implementare"));
-                    listaBox.setAlignment(Pos.CENTER);
-                    listaBox.setPrefWidth(700);
-                    root.getChildren().set(1, listaBox);
+                    ListaAnnunciView listaAnnunciView = new ListaAnnunciView(controller);
+                    root.getChildren().set(1, listaAnnunciView.getRoot());
                     break;
                 case "offerte":
                     VBox offertaBox = new VBox(new Label("Gestione Offerte - da implementare"));

@@ -10,7 +10,7 @@ public class Offerta {
     private Double prezzoOfferto;
     private String stato;
     private Date dataOfferta;
-
+    private String messaggio;
     // Costruttore completo
     public Offerta(String codiceOfferta, String codiceAnnuncio, String matricola, String tipo, 
                    Double prezzoOfferto, String stato, Date dataOfferta) {
@@ -81,6 +81,14 @@ public class Offerta {
 
     public void setDataOfferta(Date dataOfferta) {
         this.dataOfferta = dataOfferta;
+    }
+    
+    public String getMessaggio() {
+        return messaggio;
+    }
+    
+    public void setMessaggio(String messaggio) {
+        this.messaggio = messaggio;
     }
 
     @Override

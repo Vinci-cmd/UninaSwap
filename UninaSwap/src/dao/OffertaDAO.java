@@ -13,22 +13,38 @@ public class OffertaDAO {
     }
 
     public boolean creaOfferta(Offerta offerta) throws SQLException {
-        String sql = "INSERT INTO offerta (codiceofferta, dataofferta, stato, prezzoofferto, tipo, matricola, codiceannuncio) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String last = getLastCodiceOfferta(); // es. "OFF00017"
+        String prefix = "OFF";
+        int nextNum = 1;
+        if (last != null && last.startsWith(prefix)) {
+            String numPart = last.substring(prefix.length());
+            try {
+                nextNum = Integer.parseInt(numPart) + 1;
+            } catch(NumberFormatException e) {
+                throw new SQLException("Errore parsing codice offerta: " + numPart, e);
+            }
+        }
+        String newCode = String.format(prefix + "%05d", nextNum);
+        offerta.setCodiceOfferta(newCode);
+
+        String sql = "INSERT INTO offerta (codiceofferta, tipo, stato, data, prezzoofferto, matricola, codiceannuncio, messaggio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, offerta.getCodiceOfferta());
-            ps.setDate(2, offerta.getDataOfferta());
+            ps.setString(2, offerta.getTipo());
             ps.setString(3, offerta.getStato());
-            if (offerta.getPrezzoOfferto() != null) {
-                ps.setDouble(4, offerta.getPrezzoOfferto());
-            } else {
-                ps.setNull(4, Types.NUMERIC);
-            }
-            ps.setString(5, offerta.getTipo());
+            ps.setDate(4, new Date(System.currentTimeMillis()));
+            if (offerta.getPrezzoOfferto() != null)
+                ps.setDouble(5, offerta.getPrezzoOfferto());
+            else
+                ps.setNull(5, java.sql.Types.DOUBLE);
             ps.setString(6, offerta.getMatricola());
             ps.setString(7, offerta.getCodiceAnnuncio());
-            return ps.executeUpdate() == 1;
+            ps.setString(8, offerta.getMessaggio()); // questo prende null se non usato
+            int rows = ps.executeUpdate();
+            return rows == 1;
         }
     }
+
 
     public boolean aggiornaOfferta(Offerta offerta) throws SQLException {
         // Aggiornabile solo se lo stato è "inviata"
@@ -289,5 +305,15 @@ public class OffertaDAO {
             ps.setString(1, codiceOfferta);
             return ps.executeUpdate() == 1;
         }
+    }
+    public String getLastCodiceOfferta() throws SQLException {
+        String sql = "SELECT MAX(codiceofferta) AS maxcode FROM offerta WHERE codiceofferta LIKE 'OFF%'";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getString("maxcode"); // null se nessun codice OFF%
+            }
+        }
+        return null;
     }
 }
