@@ -240,6 +240,10 @@ public class ListaAnnunciView {
                             .collect(Collectors.toList());
                     try {
                         controller.inviaOffertaConOggetti(annuncio.getCodiceAnnuncio(), codiciOggetti);
+                        // *** PATCH AGGIUNTA: Aggiorna oggetti come associati all'annuncio ***
+                        for (String codiceOggetto : codiciOggetti) {
+                            controller.aggiornaCodiceAnnuncioOggetto(codiceOggetto, annuncio.getCodiceAnnuncio());
+                        }
                         dialog.close();
                         showAlert("Offerta di scambio inviata!");
                     } catch (Exception ex) {
@@ -268,6 +272,7 @@ public class ListaAnnunciView {
         dialog.setScene(new Scene(box, 400, 350));
         dialog.showAndWait();
     }
+
 
     private void mostraDettaglioAnnuncio(Annuncio annuncio) {
         Dialog<Void> dialog = new Dialog<>();

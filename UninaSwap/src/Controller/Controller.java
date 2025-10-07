@@ -51,6 +51,20 @@ public class Controller {
     }
 
     // -------------------- AUTH: Registrazione --------------------
+ // Ottiene solo le offerte inviate dall'utente (non ricevute)
+    public List<Offerta> getOfferteInviateByUtente(String matricola) throws SQLException {
+        return service.getOfferteInviateByUtente(matricola);
+    }
+
+    // Recupera la descrizione di un annuncio dato il codice
+    public String getDescrizioneAnnuncio(String codiceAnnuncio) throws SQLException {
+        return service.getDescrizioneAnnuncio(codiceAnnuncio);
+    }
+
+    public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
+        return service.getOfferteRicevuteByUtente(matricola);
+    }
+
     public boolean register(String nome, String cognome, String matricola, String email, String password, String universita) {
         try {
             String n = safeTrim(nome);
@@ -293,6 +307,10 @@ public class Controller {
         service.aggiornaCodiceAnnuncioOggetto(codiceOggetto, codiceAnnuncio);
     }
 
+    
+    public boolean eliminaOfferta(String codiceOfferta) throws SQLException {
+        return service.eliminaOfferta(codiceOfferta);
+    }
 
     // =========================================================
     // == UTILITY INTERNE

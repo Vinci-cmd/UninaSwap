@@ -28,6 +28,18 @@ public class Service {
     public Utente login(String email, String password) throws SQLException {
         return utenteDAO.login(email, password);
     }
+    
+ // Offerte inviate (query filtrata sulla tabella offerte per colonna "matricola", e non "proprietario annuncio")
+    public List<Offerta> getOfferteInviateByUtente(String matricola) throws SQLException {
+        return offertaDAO.getOfferteInviateByUtente(matricola);
+    }
+
+    // Recupera descrizione annuncio da codice (usando il DAO)
+    public String getDescrizioneAnnuncio(String codiceAnnuncio) throws SQLException {
+        Annuncio ann = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+        return ann != null ? ann.getDescrizione() : "";
+    }
+
 
     public Utente getUtenteByMatricola(String matricola) throws SQLException {
         return utenteDAO.getUtenteByMatricola(matricola);
@@ -171,6 +183,10 @@ public class Service {
 
     public double[] getStatisticheVenditeAccettate() throws SQLException {
         return offertaDAO.getStatisticheVenditeAccettate();
+    }
+
+    public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
+        return offertaDAO.getOfferteRicevuteByUtente(matricola);
     }
 
     // CONTROLLO OFFERTA E INVIO

@@ -9,18 +9,20 @@ public class Offerta {
     private String tipo;
     private Double prezzoOfferto;
     private String stato;
-    private Date dataOfferta;
+    private Date data;
     private String messaggio;
+    private String descrizioneAnnuncio;
+
     // Costruttore completo
-    public Offerta(String codiceOfferta, String codiceAnnuncio, String matricola, String tipo, 
-                   Double prezzoOfferto, String stato, Date dataOfferta) {
+    public Offerta(String codiceOfferta, String codiceAnnuncio, String matricola, String tipo,
+                   Double prezzoOfferto, String stato, Date data) {
         this.codiceOfferta = codiceOfferta;
         this.codiceAnnuncio = codiceAnnuncio;
         this.matricola = matricola;
         this.tipo = tipo;
         this.prezzoOfferto = prezzoOfferto;
         this.stato = stato;
-        this.dataOfferta = dataOfferta;
+        this.data = data;
     }
 
     // Costruttore vuoto
@@ -30,7 +32,6 @@ public class Offerta {
     public String getCodiceOfferta() {
         return codiceOfferta;
     }
-
     public void setCodiceOfferta(String codiceOfferta) {
         this.codiceOfferta = codiceOfferta;
     }
@@ -38,7 +39,6 @@ public class Offerta {
     public String getCodiceAnnuncio() {
         return codiceAnnuncio;
     }
-
     public void setCodiceAnnuncio(String codiceAnnuncio) {
         this.codiceAnnuncio = codiceAnnuncio;
     }
@@ -46,7 +46,6 @@ public class Offerta {
     public String getMatricola() {
         return matricola;
     }
-
     public void setMatricola(String matricola) {
         this.matricola = matricola;
     }
@@ -54,7 +53,6 @@ public class Offerta {
     public String getTipo() {
         return tipo;
     }
-
     public void setTipo(String tipo) {
         this.tipo = tipo;
     }
@@ -62,7 +60,6 @@ public class Offerta {
     public Double getPrezzoOfferto() {
         return prezzoOfferto;
     }
-
     public void setPrezzoOfferto(Double prezzoOfferto) {
         this.prezzoOfferto = prezzoOfferto;
     }
@@ -70,25 +67,29 @@ public class Offerta {
     public String getStato() {
         return stato;
     }
-
     public void setStato(String stato) {
         this.stato = stato;
     }
 
-    public Date getDataOfferta() {
-        return dataOfferta;
+    public Date getData() {
+        return data;
+    }
+    public void setdata(Date data) {
+        this.data = data;
     }
 
-    public void setDataOfferta(Date dataOfferta) {
-        this.dataOfferta = dataOfferta;
-    }
-    
     public String getMessaggio() {
         return messaggio;
     }
-    
     public void setMessaggio(String messaggio) {
         this.messaggio = messaggio;
+    }
+
+    public String getDescrizioneAnnuncio() {
+        return descrizioneAnnuncio;
+    }
+    public void setDescrizioneAnnuncio(String descrizioneAnnuncio) {
+        this.descrizioneAnnuncio = descrizioneAnnuncio;
     }
 
     @Override
@@ -100,7 +101,9 @@ public class Offerta {
                 ", tipo='" + tipo + '\'' +
                 ", prezzoOfferto=" + prezzoOfferto +
                 ", stato='" + stato + '\'' +
-                ", dataOfferta=" + dataOfferta +
+                ", data=" + data +
+                ", messaggio='" + messaggio + '\'' +
+                ", descrizioneAnnuncio='" + descrizioneAnnuncio + '\'' +
                 '}';
     }
 }

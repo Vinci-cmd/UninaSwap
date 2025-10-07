@@ -57,22 +57,21 @@ public class HomePageView {
                     break;
                 }
                 case "offerte_inviate": {
-                    VBox inviateBox = new VBox(new Label("Qui apparirà la pagina Offerte Inviate"));
-                    inviateBox.setAlignment(Pos.CENTER);
-                    inviateBox.setPrefWidth(700);
-                    Node contentInv = inviateBox;
+                    OfferteInviateView offerteInvView = new OfferteInviateView(controller);
+                    Node contentInv = offerteInvView.getRoot();
                     root.getChildren().set(1, contentInv);
                     HBox.setHgrow(contentInv, Priority.ALWAYS);
                     break;
                 }
+
                 case "offerte_ricevute": {
-                    VBox ricevuteBox = new VBox(new Label("Qui apparirà la pagina Offerte Ricevute"));
-                    ricevuteBox.setAlignment(Pos.CENTER);
-                    ricevuteBox.setPrefWidth(700);
-                    Node contentRcv = ricevuteBox;
+                    OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
+                    Node contentRcv = offerteRcvView.getRoot();
                     root.getChildren().set(1, contentRcv);
                     HBox.setHgrow(contentRcv, Priority.ALWAYS);
+                    break;
                 }
+
                 case "oggetti":
                     OggettiView oggettiView = new OggettiView(controller);
                     root.getChildren().set(1, oggettiView.getRoot());
