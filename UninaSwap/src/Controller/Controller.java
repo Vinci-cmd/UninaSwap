@@ -34,7 +34,11 @@ public class Controller {
     public Utente getUtenteCorrente() {
         return utenteCorrente;
     }
-
+    
+    public Utente getUtenteByMatricola(String matricola) throws SQLException {
+        return service.getUtenteByMatricola(matricola);
+    }
+    
     public void logout() {
         utenteCorrente = null;
     }
@@ -68,7 +72,10 @@ public class Controller {
     public boolean inviaOfferta(String codiceAnnuncio, String tipo, Double prezzoOfferto) throws SQLException {
         return service.inviaOffertaLogica(codiceAnnuncio, tipo, prezzoOfferto, utenteCorrente.getMatricola());
     }
-
+    public boolean inviaOfferta(String codiceAnnuncio, String tipo, Double prezzoOfferto, String messaggio) throws SQLException {
+        return service.inviaOffertaComplessiva(codiceAnnuncio, tipo, prezzoOfferto, messaggio, utenteCorrente.getMatricola());
+    }
+    
     public boolean inviaOffertaConOggetti(String codiceAnnuncio, List<String> codiciOggetti) throws SQLException {
         return service.inviaOffertaConOggettiLogica(codiceAnnuncio, codiciOggetti, utenteCorrente.getMatricola());
     }
@@ -111,7 +118,25 @@ public class Controller {
         }
         return codici;
     }
-
+    public List<Oggetto> getOggettiUtenteObj(String matricola) throws SQLException {
+        return service.getOggettiUtente(matricola);
+    }
+    
+    public boolean creaOggetto(Oggetto oggetto) throws SQLException {
+        String matricola = getUtenteCorrente().getMatricola();
+        return service.creaOggetto(oggetto, matricola);
+    }
+    
+    public boolean modificaOggetto(Oggetto oggetto) throws SQLException {
+    	return service.modificaOggetto(oggetto);
+    }
+    
+    public boolean eliminaOggetto(String codiceOggetto) throws SQLException{
+        return service.eliminaOggetto(codiceOggetto);
+    }	
+    public void aggiornaCodiceAnnuncioOggetto(String codiceOggetto, String codiceAnnuncio) throws SQLException {
+        service.aggiornaCodiceAnnuncioOggetto(codiceOggetto, codiceAnnuncio);
+    }
     public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo) throws SQLException {
         Date oggi = new Date(System.currentTimeMillis());
         Annuncio nuovoAnnuncio = new Annuncio(

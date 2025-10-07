@@ -1,8 +1,6 @@
 package gui;
 
 import Controller.Controller;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -11,12 +9,12 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import model.Annuncio;
-
+import model.*;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ListaAnnunciView {
     private VBox root;
@@ -43,22 +41,33 @@ public class ListaAnnunciView {
         filtriBox.setAlignment(Pos.CENTER_LEFT);
 
         cbCategoria = new ComboBox<>();
-        cbCategoria.setPromptText("Categoria");
+        cbCategoria.getItems().add("Categoria");
+        cbCategoria.setValue("Categoria");
+        // Popola una sola volta all’avvio
+        try {
+            Set<String> uniche = controller.getAnnunciAttiviRaw().stream()
+                    .map(Annuncio::getCategoria)
+                    .filter(cat -> cat != null && !cat.isBlank())
+                    .collect(Collectors.toSet());
+            cbCategoria.getItems().addAll(uniche);
+        } catch (Exception ignored) {}
+        cbCategoria.setOnAction(e -> loadAnnunciConFiltri());
 
         cbTipologia = new ComboBox<>();
-        cbTipologia.getItems().setAll("", "vendita", "scambio", "regalo");
-        cbTipologia.setPromptText("Tipologia");
+        cbTipologia.getItems().add("Tipologia");
+        cbTipologia.getItems().addAll("vendita", "scambio", "regalo");
+        cbTipologia.setValue("Tipologia");
+        cbTipologia.setOnAction(e -> loadAnnunciConFiltri());
 
         tfPrezzoMax = new TextField();
         tfPrezzoMax.setPromptText("Prezzo max");
+        tfPrezzoMax.setOnKeyReleased(e -> loadAnnunciConFiltri());
 
         txtSearch = new TextField();
         txtSearch.setPromptText("Ricerca descrizione...");
+        txtSearch.setOnKeyReleased(e -> loadAnnunciConFiltri());
 
-        Button btnFiltra = new Button("Filtra");
-        btnFiltra.setOnAction(e -> loadAnnunciConFiltri());
-
-        filtriBox.getChildren().addAll(cbCategoria, cbTipologia, tfPrezzoMax, txtSearch, btnFiltra);
+        filtriBox.getChildren().addAll(cbCategoria, cbTipologia, tfPrezzoMax, txtSearch);
 
         // ------------- TABELLA ANNUNCI -------------
         tableAnnunci = new TableView<>();
@@ -77,6 +86,18 @@ public class ListaAnnunciView {
 
         tableAnnunci.getColumns().addAll(colCodice, colCategoria, colTipologia, colDescrizione, colPrezzo, colStato);
         tableAnnunci.setPrefHeight(350);
+
+        // Doppio click riga --> mostra dettaglio annuncio
+        tableAnnunci.setRowFactory(tv -> {
+            TableRow<Annuncio> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && (!row.isEmpty())) {
+                    Annuncio annuncio = row.getItem();
+                    mostraDettaglioAnnuncio(annuncio);
+                }
+            });
+            return row;
+        });
 
         // --------------- INVIA OFFERTA -------------
         Button btnInviaOfferta = new Button("Invia Offerta");
@@ -103,15 +124,18 @@ public class ListaAnnunciView {
             String prezzoStr = tfPrezzoMax.getText();
             String search = txtSearch.getText();
 
-            // Carica solo annunci attivi
-            List<Annuncio> annunci = controller.getAnnunciAttiviRaw();
+            // Carica solo annunci attivi DI ALTRI (NON i tuoi)
+            String matricolaUtente = controller.getUtenteCorrente().getMatricola();
+            List<Annuncio> annunci = controller.getAnnunciAttiviRaw().stream()
+                    .filter(a -> !a.getMatricola().equals(matricolaUtente))
+                    .collect(Collectors.toList());
 
-            // Filtra per categoria
-            if (categoria != null && !categoria.isBlank()) {
+            // Filtra per categoria se diverso da "Categoria"
+            if (categoria != null && !"Categoria".equals(categoria)) {
                 annunci = annunci.stream().filter(a -> a.getCategoria().equalsIgnoreCase(categoria)).collect(Collectors.toList());
             }
-            // Filtra per tipologia
-            if (tipologia != null && !tipologia.isBlank()) {
+            // Filtra per tipologia se diverso da "Tipologia"
+            if (tipologia != null && !"Tipologia".equals(tipologia)) {
                 annunci = annunci.stream().filter(a -> a.getTipologia().equalsIgnoreCase(tipologia)).collect(Collectors.toList());
             }
             // Filtra prezzo max (solo per annunci vendita)
@@ -133,19 +157,12 @@ public class ListaAnnunciView {
 
             tableAnnunci.getItems().setAll(annunci);
 
-            // Compila combo categoria una tantum
-            Set<String> uniche = controller.getAnnunciAttiviRaw().stream()
-                    .map(Annuncio::getCategoria)
-                    .filter(cat -> cat != null && !cat.isBlank())
-                    .collect(Collectors.toSet());
-            cbCategoria.getItems().setAll("");
-            cbCategoria.getItems().addAll(uniche);
-
         } catch (SQLException e) {
             e.printStackTrace();
             showAlert("Errore caricamento annunci: " + e.getMessage());
         }
     }
+
 
     private void openDialogInvioOfferta(Annuncio annuncio) {
         Stage dialog = new Stage();
@@ -157,7 +174,6 @@ public class ListaAnnunciView {
 
         Label tipoLabel = new Label("Tipologia annuncio: " + annuncio.getTipologia());
 
-        // Queste UI cambiano a seconda della tipologia
         TextField tfPrezzo = new TextField();
         tfPrezzo.setPromptText("Prezzo offerto");
         TextArea taMessaggio = new TextArea();
@@ -186,12 +202,49 @@ public class ListaAnnunciView {
                 });
                 break;
             case "scambio":
-                // In questa demo puoi solo proporre, estendibile con lista oggetti
-                box.getChildren().addAll(tipoLabel, new Label("Proponi i tuoi oggetti in seguito (funzionalità avanzata)"), btnInvia);
+                // --- GESTIONE SELEZIONE OGGETTI PERSONALI PER SCAMBIO ---
+                String matricolaUtente = controller.getUtenteCorrente().getMatricola();
+                List<Oggetto> oggettiPersonali;
+                try {
+                    oggettiPersonali = controller.getOggettiUtenteObj(matricolaUtente)
+                            .stream()
+                            .filter(o -> o.getCodiceAnnuncio() == null) // Solo oggetti NON associati
+                            .collect(Collectors.toList());
+                } catch (Exception ex) {
+                    showAlert("Errore caricamento oggetti: " + ex.getMessage());
+                    return;
+                }
+                Label lblSelect = new Label("Scegli i tuoi oggetti da proporre nello scambio:");
+                ListView<Oggetto> listOggetti = new ListView<>();
+                listOggetti.getItems().addAll(oggettiPersonali);
+                listOggetti.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+                listOggetti.setCellFactory(lv -> new ListCell<Oggetto>() {
+                    @Override
+                    protected void updateItem(Oggetto oggetto, boolean empty) {
+                        super.updateItem(oggetto, empty);
+                        setText(empty || oggetto == null ?
+                                null :
+                                oggetto.getNome() + " - " + oggetto.getCategoria() + " (" + oggetto.getDescrizione() + ")");
+                    }
+                });
+                box.getChildren().addAll(tipoLabel, lblSelect, listOggetti, btnInvia);
+
                 btnInvia.setOnAction(e -> {
-                    // Da espandere con scelta oggetti
-                    showAlert("Funzionalità scambio oggetti da completare!");
-                    dialog.close();
+                    List<Oggetto> selezionati = listOggetti.getSelectionModel().getSelectedItems();
+                    if (selezionati == null || selezionati.isEmpty()) {
+                        showAlert("Seleziona almeno un oggetto da proporre per lo scambio!");
+                        return;
+                    }
+                    List<String> codiciOggetti = selezionati.stream()
+                            .map(Oggetto::getCodiceOggetto)
+                            .collect(Collectors.toList());
+                    try {
+                        controller.inviaOffertaConOggetti(annuncio.getCodiceAnnuncio(), codiciOggetti);
+                        dialog.close();
+                        showAlert("Offerta di scambio inviata!");
+                    } catch (Exception ex) {
+                        showAlert("Errore invio offerta: " + ex.getMessage());
+                    }
                 });
                 break;
             case "regalo":
@@ -202,7 +255,7 @@ public class ListaAnnunciView {
                         return;
                     }
                     try {
-                        controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "regalo", null);
+                        controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "regalo", null, taMessaggio.getText());
                         dialog.close();
                         showAlert("Richiesta inviata!");
                     } catch (Exception ex) {
@@ -212,7 +265,44 @@ public class ListaAnnunciView {
                 break;
         }
 
-        dialog.setScene(new Scene(box, 350, 180));
+        dialog.setScene(new Scene(box, 400, 350));
+        dialog.showAndWait();
+    }
+
+    private void mostraDettaglioAnnuncio(Annuncio annuncio) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Dettaglio Annuncio");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        String proprietarioStr = annuncio.getMatricola();
+        try {
+            Utente ut = controller.getUtenteByMatricola(annuncio.getMatricola());
+            if (ut != null) {
+                proprietarioStr = ut.getNome() + " " + ut.getCognome();
+            }
+        } catch (Exception ignored) {}
+
+        VBox box = new VBox(14);
+        box.setPadding(new Insets(14));
+        box.setPrefWidth(320);
+
+        box.getChildren().addAll(
+            new Label("Codice: " + annuncio.getCodiceAnnuncio()),
+            new Label("Categoria: " + annuncio.getCategoria()),
+            new Label("Tipologia: " + annuncio.getTipologia()),
+            new Label("Stato: " + annuncio.getStato()),
+            new Label("Prezzo: " + (annuncio.getPrezzo() != null ? ("€ " + annuncio.getPrezzo()) : "N/A")),
+            new Label("Proprietario: " + proprietarioStr),
+            new Label("Data pubblicazione: " + (annuncio.getDataPubblicazione() != null ? annuncio.getDataPubblicazione().toString() : "")),
+            new Label("Descrizione:"),
+            new TextArea(annuncio.getDescrizione()) {{
+                setEditable(false);
+                setWrapText(true);
+                setPrefRowCount(4);
+                setStyle("-fx-opacity: 1; -fx-background-color: #fafaff;");
+            }}
+        );
+        dialog.getDialogPane().setContent(box);
         dialog.showAndWait();
     }
 

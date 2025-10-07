@@ -48,6 +48,10 @@ public class HomePageView {
                     offertaBox.setPrefWidth(700);
                     root.getChildren().set(1, offertaBox);
                     break;
+                case "oggetti":
+                    OggettiView oggettiView = new OggettiView(controller);
+                    root.getChildren().set(1, oggettiView.getRoot());
+                    break;
                 case "statistiche":
                     VBox statsBox = new VBox(new Label("Statistiche - da implementare"));
                     statsBox.setAlignment(Pos.CENTER);

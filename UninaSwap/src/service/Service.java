@@ -108,8 +108,8 @@ public class Service {
     }
 
     // OGGETTI
-    public boolean creaOggetto(Oggetto oggetto) throws SQLException {
-        return oggettoDAO.creaOggetto(oggetto);
+    public boolean creaOggetto(Oggetto oggetto, String matricola) throws SQLException {
+        return oggettoDAO.creaOggetto(oggetto, matricola);
     }
 
     public boolean aggiornaOggetto(Oggetto oggetto) throws SQLException {
@@ -118,6 +118,13 @@ public class Service {
 
     public boolean eliminaOggetto(String codiceOggetto) throws SQLException {
         return oggettoDAO.eliminaOggetto(codiceOggetto);
+    }
+    
+    public boolean modificaOggetto(Oggetto oggetto) throws SQLException {
+        return oggettoDAO.aggiornaOggetto(oggetto);
+    }
+    public void aggiornaCodiceAnnuncioOggetto(String codiceOggetto, String codiceAnnuncio) throws SQLException {
+        oggettoDAO.aggiornaCodiceAnnuncioOggetto(codiceOggetto, codiceAnnuncio);
     }
 
     public Oggetto getOggettoByCodice(String codiceOggetto) throws SQLException {
@@ -207,7 +214,16 @@ public class Service {
         offerta.setCodiceOfferta(java.util.UUID.randomUUID().toString());
         return inviaOfferta(offerta, null);
     }
-    
+    public boolean inviaOffertaComplessiva(String codiceAnnuncio, String tipo, Double prezzoOfferto, String messaggio, String matricolaUtente) throws SQLException {
+        Offerta offerta = new Offerta();
+        offerta.setCodiceAnnuncio(codiceAnnuncio);
+        offerta.setTipo(tipo);
+        offerta.setPrezzoOfferto(prezzoOfferto);
+        offerta.setMatricola(matricolaUtente);
+        offerta.setStato("inviata");
+        offerta.setMessaggio(messaggio);
+        return offertaDAO.creaOfferta(offerta);
+    }
     public boolean inviaOffertaConOggettiLogica(String codiceAnnuncio, List<String> codiciOggetti, String matricolaUtente) throws SQLException {
         Offerta offerta = new Offerta();
         offerta.setCodiceAnnuncio(codiceAnnuncio);
