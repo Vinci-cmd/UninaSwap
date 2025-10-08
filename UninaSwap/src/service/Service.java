@@ -111,6 +111,12 @@ public class Service {
         return offertaDAO.getOffertaByCodice(codiceOfferta);
     }
 
+    
+    public List<Offerta> getOfferteByCodiceAnnuncio(String codiceAnnuncio) throws SQLException {
+        return offertaDAO.getOfferteByCodiceAnnuncio(codiceAnnuncio);
+    }
+    
+    
     public boolean accettaOfferta(String codiceOfferta) throws SQLException {
         return offertaDAO.accettaOfferta(codiceOfferta);
     }

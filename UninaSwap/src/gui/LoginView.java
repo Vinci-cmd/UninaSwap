@@ -13,6 +13,8 @@ import javafx.stage.Stage;
 
 public class LoginView {
     private VBox root;
+    private final Controller controller;
+    private final Stage stage; // Stage sempre presente!
 
     // --- LOGIN ---
     private TextField emailField;
@@ -35,12 +37,11 @@ public class LoginView {
     private Label registerMessageLabel;
     private Hyperlink backToLoginLink;
 
-    private final Controller controller;
-
-    public LoginView(Controller controller) {
+    public LoginView(Stage stage, Controller controller) {
         this.controller = controller;
+        this.stage = stage; // Stage salvato!
         createShell();
-        showLoginView(); // di default mostra login
+        showLoginView();
     }
 
     private void createShell() {
@@ -48,7 +49,6 @@ public class LoginView {
         root.setPadding(new Insets(24));
         root.setSpacing(0);
         root.setFillWidth(true);
-        // SFONDO GRADIENT SCURO + font base chiaro
         root.setStyle(
             "-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);" +
             "-fx-font-family: 'Segoe UI', 'Roboto', 'Arial';"
@@ -59,7 +59,6 @@ public class LoginView {
     private void showLoginView() {
         root.getChildren().clear();
 
-        // ---- CARD CENTRATA ----
         VBox card = new VBox(14);
         card.setAlignment(Pos.CENTER_LEFT);
         card.setPadding(new Insets(22));
@@ -73,13 +72,11 @@ public class LoginView {
         );
         card.setEffect(new DropShadow(24, Color.color(0,0,0,0.45)));
 
-        // TITOLI
         Label title = new Label("Accedi a UninaSwap");
         title.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 22px; -fx-font-weight: 900;");
         Label subtitle = new Label("Gestisci annunci e scambi universitari in modo semplice.");
         subtitle.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px;");
 
-        // CAMPI
         Label emailLbl = smallLabel("Email");
         emailField = styledTextField("es. nome.cognome@unina.it");
 
@@ -89,7 +86,6 @@ public class LoginView {
         passwordMirror.setManaged(false);
         passwordMirror.setVisible(false);
 
-        // Mostra/Nascondi password (teniamo solo questo)
         showPass = new CheckBox("Mostra password");
         showPass.setStyle("-fx-text-fill: #EAF0FF;");
         showPass.selectedProperty().addListener((obs, oldV, show) -> {
@@ -102,13 +98,11 @@ public class LoginView {
             }
         });
 
-        // MESSAGGIO ERRORE
         loginMessageLabel = new Label();
         loginMessageLabel.setManaged(false);
         loginMessageLabel.setVisible(false);
         loginMessageLabel.setStyle("-fx-text-fill: #ff6b6b; -fx-font-size: 12px;");
 
-        // BOTTONI
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
 
@@ -123,17 +117,14 @@ public class LoginView {
 
         actions.getChildren().addAll(loginButton, registerBtn);
 
-        // ENTER invia
         emailField.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) tryLogin(); });
         passwordField.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) tryLogin(); });
         passwordMirror.setOnKeyPressed(ev -> { if (ev.getCode() == KeyCode.ENTER) tryLogin(); });
 
-        // LINK REGISTRAZIONE (secondo blocco)
         goToRegisterLink = new Hyperlink("Non hai un account? Crea un nuovo account");
         goToRegisterLink.setOnAction(e -> showRegisterView());
         goToRegisterLink.setStyle("-fx-text-fill: #7af7c3; -fx-underline: true; -fx-font-size: 12px;");
 
-        // MONTAGGIO CARD (rimosse le opzioni Ricordami / Password dimenticata)
         card.getChildren().addAll(
             title,
             subtitle,
@@ -147,12 +138,10 @@ public class LoginView {
             goToRegisterLink
         );
 
-        // WRAP per centrare verticalmente
         StackPane centerWrap = new StackPane(card);
         StackPane.setAlignment(card, Pos.CENTER);
         centerWrap.setPadding(new Insets(16));
 
-        // HEADER (logo/brand minimale)
         Label brand = new Label("UninaSwap");
         brand.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 18px; -fx-font-weight: 800;");
         HBox header = new HBox(brand);
@@ -309,13 +298,12 @@ public class LoginView {
     }
 
     private void goHome() {
-        HomePageView homepage = new HomePageView(controller);
-        Stage stage = (Stage) root.getScene().getWindow();
+        HomePageView homepage = new HomePageView(stage,controller);
+        // Stage sempre presente!
         stage.setScene(new Scene(homepage.getRoot(), 1000, 700));
         stage.setTitle("UninaSwap - Dashboard");
     }
 
-    // =============== UI HELPERS (stile inline, no CSS esterno) ===============
     private Label smallLabel(String text) {
         Label l = new Label(text);
         l.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px; -fx-font-weight: 700;");

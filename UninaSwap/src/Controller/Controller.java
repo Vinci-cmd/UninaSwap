@@ -1,6 +1,8 @@
 package Controller;
 
 import javafx.collections.FXCollections;
+
+import java.util.*;
 import javafx.collections.ObservableList;
 import model.*;
 import service.Service;
@@ -101,6 +103,44 @@ public class Controller {
             return false;
         }
     }
+    
+public List<String> getNotificheUtente(String matricola) {
+    List<String> notif = new ArrayList<>();
+    try {
+        // 1. Ottieni i tuoi annunci
+        List<Annuncio> mieiAnnunci = getAnnunciByUtente(matricola);
+        int offerteRicevute = 0;
+        
+        // 2. Per ogni annuncio, carica le sue offerte e filtra quelle "inviata"
+        for (Annuncio a : mieiAnnunci) {
+            List<Offerta> offerteSuAnnuncio = service.getOfferteByCodiceAnnuncio(a.getCodiceAnnuncio()); // <-- serve/implementa questo metodo se non esiste!
+            for (Offerta o : offerteSuAnnuncio) {
+                if ("inviata".equalsIgnoreCase(o.getStato())) {
+                    offerteRicevute++;
+                }
+            }
+        }
+        if (offerteRicevute > 0)
+            notif.add("Hai " + offerteRicevute + " offerte ricevute da accettare.");
+
+        // Annunci scaduti (già va bene come hai)
+        int annunciScaduti = 0;
+        for (Annuncio a : mieiAnnunci) {
+            if ("scaduto".equalsIgnoreCase(a.getStato())) {
+                annunciScaduti++;
+            }
+        }
+        if (annunciScaduti > 0)
+            notif.add("Hai " + annunciScaduti + " annunci scaduti.");
+
+    } catch (Exception e) {
+        notif.add("Errore nel caricamento notifiche.");
+    }
+    return notif;
+}
+
+
+
 
     /**
      * Restituisce l'utente correntemente loggato (può essere null).

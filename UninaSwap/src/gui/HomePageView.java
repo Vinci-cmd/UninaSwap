@@ -4,24 +4,27 @@ import Controller.Controller;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-
+import javafx.stage.Stage;
+import java.util.*;
 import java.sql.SQLException;
 
 public class HomePageView {
     private HBox root;
     private final Controller controller;
+    private final Stage stage; // aggiunto per il logout
 
-    // ↓↓↓ aggiunto: teniamo un riferimento alla sidebar
     private SideMenuView sideMenu;
 
-    public HomePageView(Controller controller) {
+    public HomePageView(Stage stage, Controller controller) {
         this.controller = controller;
+        this.stage = stage;
         createUI();
     }
 
@@ -33,17 +36,13 @@ public class HomePageView {
             "-fx-font-family: 'Segoe UI','Roboto','Arial';"
         );
 
-        // menu laterale (usa il campo)
         sideMenu = new SideMenuView();
 
-        // contenuto iniziale: home
         Node contentArea = createHomeContentArea();
 
-        // layout principale
         root.getChildren().addAll(sideMenu.getRoot(), contentArea);
         HBox.setHgrow(contentArea, Priority.ALWAYS);
 
-        // navigazione menu laterale (fixato break mancante su offerte_ricevute)
         sideMenu.setOnMenuSelection(key -> {
             switch (key) {
                 case "home": {
@@ -73,13 +72,11 @@ public class HomePageView {
                     HBox.setHgrow(contentInv, Priority.ALWAYS);
                     break;
                 }
-
                 case "offerte_ricevute": {
                     OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
                     Node contentRcv = offerteRcvView.getRoot();
                     root.getChildren().set(1, contentRcv);
                     HBox.setHgrow(contentRcv, Priority.ALWAYS);
-
                     break;
                 }
                 case "oggetti": {
@@ -98,13 +95,12 @@ public class HomePageView {
                 }
             }
         });
-}
-    /** Crea il contenuto della home (header + hero + notifiche + stats) */
+    }
+
     private Node createHomeContentArea() {
         BorderPane content = new BorderPane();
         content.setPadding(new Insets(10));
 
-        // HEADER
         HBox header = new HBox(8);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(6, 6, 16, 6));
@@ -121,17 +117,20 @@ public class HomePageView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Bottone "Aiuto" (per ora rimane placeholder, lo colleghiamo dopo)
-        Button help = ghostButton("Aiuto", () -> {}); 
+        Button logout = ghostButton("Logout", () -> {
+            controller.logout(); // azzera sessione utente se serve
+            LoginView loginView = new LoginView(stage, controller);
+            Scene loginScene = new Scene(loginView.getRoot(), 560, 450);
+            stage.setScene(loginScene);
+            stage.setTitle("UninaSwap - Login");
+        });
 
-        header.getChildren().addAll(brand, sub, spacer, help);
+        header.getChildren().addAll(brand, sub, spacer, logout);
         content.setTop(header);
 
-        // CENTRO
         VBox center = new VBox(16);
         center.setFillWidth(true);
 
-        // HERO
         HBox heroRow = new HBox(16);
         heroRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -143,25 +142,46 @@ public class HomePageView {
         VBox quickActions = card(
                 title("Azioni rapide"),
                 row(
-                        // ← QUI: “Crea annuncio” FUNZIONA
-                        primaryButton("Crea annuncio", this::openAnnunciGestisci),
-                        // Questi due li colleghiamo dopo, step-by-step
-                        ghostButton("Gestisci annunci", () -> navigate("annunci_gestisci")),
-                        ghostButton("Lista annunci", () -> navigate("annunci_lista"))
+                    primaryButton("Crea annuncio", () -> {
+                        AnnunciView annunciView = new AnnunciView(controller);
+                        annunciView.mostraCreaAnnuncioDialog(); // <--- chiama direttamente la creazione annuncio
+                    }),
+                    ghostButton("Gestisci annunci", () -> {
+                        AnnunciView annunciView = new AnnunciView(controller);
+                        Node newContent = annunciView.getRoot();
+                        root.getChildren().set(1, newContent);
+                        HBox.setHgrow(newContent, Priority.ALWAYS);
+                    }),
+                    ghostButton("Gestisci offerte", () -> {
+                        OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
+                        Node contentRcv = offerteRcvView.getRoot();
+                        root.getChildren().set(1, contentRcv);
+                        HBox.setHgrow(contentRcv, Priority.ALWAYS);
+                    })
                 )
         );
 
         HBox.setHgrow(heroCard, Priority.ALWAYS);
         heroRow.getChildren().addAll(heroCard, quickActions);
 
-        // NOTIFICHE
         ListView<String> notifList = new ListView<>();
         notifList.setPrefHeight(200);
-        notifList.getItems().addAll(
-                "Hai 2 offerte da accettare",
-                "Scambio programmato domani",
-                "Annuncio #123 ha ricevuto una nuova offerta"
-        );
+        notifList.getItems().clear();
+        try {
+            String matricola = controller.getUtenteCorrente() != null ? controller.getUtenteCorrente().getMatricola() : null;
+            if (matricola != null) {
+                List<String> notifiche = controller.getNotificheUtente(matricola);
+                if (notifiche.isEmpty()) {
+                    notifList.getItems().add("Nessuna notifica recente.");
+                } else {
+                    notifList.getItems().addAll(notifiche);
+                }
+            } else {
+                notifList.getItems().add("Nessuna notifica, login richiesto.");
+            }
+        } catch (Exception e) {
+            notifList.getItems().add("Errore nel caricamento notifiche.");
+        }
         notifList.setStyle(
             "-fx-background-color: transparent;" +
             "-fx-control-inner-background: rgba(255,255,255,0.04);" +
@@ -175,7 +195,6 @@ public class HomePageView {
                 notifList
         );
 
-        // STATISTICHE
         HBox statsRow = new HBox(16);
         statsRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -209,18 +228,13 @@ public class HomePageView {
         return content;
     }
 
-    // ====== ACTION: apre la vista “gestisci/crea annuncio” ======
     private void openAnnunciGestisci() {
         AnnunciView annunciView = new AnnunciView(controller);
         Node newContent = annunciView.getRoot();
         root.getChildren().set(1, newContent);
         HBox.setHgrow(newContent, Priority.ALWAYS);
-
-        // Se in futuro la tua SideMenuView espone un metodo di selezione:
-        // sideMenu.select("annunci_gestisci");
     }
 
-    // ======= UI HELPERS (inline style) =======
     private VBox card(Node... children) {
         VBox card = new VBox(10, children);
         card.setPadding(new Insets(18));
@@ -335,7 +349,6 @@ public class HomePageView {
     }
 
     private void navigate(String key) {
-        // Placeholder per le altre azioni: le collegheremo step-by-step
         System.out.println("Vai a: " + key);
     }
 }

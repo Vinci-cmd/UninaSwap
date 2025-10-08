@@ -342,4 +342,33 @@
 	    }
 	    
 
+	    public List<Offerta> getOfferteByCodiceAnnuncio(String codiceAnnuncio) throws SQLException {
+	        List<Offerta> list = new ArrayList<>();
+	        String sql = "SELECT * FROM offerta WHERE codiceannuncio = ?";
+	        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+	            ps.setString(1, codiceAnnuncio);
+	            ResultSet rs = ps.executeQuery();
+	            while (rs.next()) {
+	                Double prezzoOfferto = null;
+	                Object prezzoObj = rs.getObject("prezzoofferto");
+	                if (prezzoObj != null) {
+	                    prezzoOfferto = rs.getDouble("prezzoofferto");
+	                }
+	                list.add(new Offerta(
+	                    rs.getString("codiceofferta"),
+	                    rs.getString("codiceannuncio"),
+	                    rs.getString("matricola"),
+	                    rs.getString("tipo"),
+	                    prezzoOfferto,
+	                    rs.getString("stato"),
+	                    rs.getDate("data")
+	                ));
+	            }
+	        }
+	        return list;
+	    }
+
+
+	    
+	    
 	}

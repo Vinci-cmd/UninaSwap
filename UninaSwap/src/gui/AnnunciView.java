@@ -29,14 +29,6 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-/**
- * AnnunciView — robusta e coerente con lo stile dark.
- * - Filtri stabili con FilteredList/SortedList
- * - ComboBox non più “autofiltranti” (niente mutate dell’items), così le tendine mostrano sempre le opzioni
- * - Ricerca con debounce (200ms) per evitare ricarichi e glitch
- * - Tabella leggibile: zebra, hover soft, badge stato, prezzo formattato
- * - Dialog semplificato (categoria editabile, ma senza mutare items a runtime)
- */
 public class AnnunciView {
 
     private VBox root;
@@ -157,10 +149,17 @@ public class AnnunciView {
             return cell;
         });
 
+        // AGGIORNATO: Stile prezzo da ListaAnnunciView (verde #7af7c3, font-weight 900, allineamento a destra)
         TableColumn<Annuncio, Double> cPrice = new TableColumn<>("Prezzo");
         cPrice.setCellValueFactory(new PropertyValueFactory<>("prezzo"));
         cPrice.setPrefWidth(120);
-        cPrice.setCellFactory(col -> priceCell());
+        cPrice.setCellFactory(tc -> new TableCell<>() {
+            @Override protected void updateItem(Double value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(empty || value == null ? "" : String.format("€ %.2f", value));
+                setStyle("-fx-text-fill: #7af7c3; -fx-font-weight:900; -fx-alignment:CENTER_RIGHT; -fx-padding:0 7 0 0;");
+            }
+        });
 
         TableColumn<Annuncio, String> cState = new TableColumn<>("Stato");
         cState.setCellValueFactory(new PropertyValueFactory<>("stato"));
@@ -178,13 +177,19 @@ public class AnnunciView {
                     openDialog(row.getItem());
                 }
             });
-            // zebra + hover soft (senz'altro codice che interferisca)
+            // zebra + hover soft + selezione (AGGIORNATO con colori ListaAnnunciView)
             row.indexProperty().addListener((obs, old, idx) -> {
-                if (!row.isSelected()) row.setStyle(zebraStyle(idx.intValue()));
+                if (!row.isSelected()) row.setStyle(zebraStyle(idx.intValue(), row.isSelected()));
             });
-            row.selectedProperty().addListener((o,w,is) -> row.setStyle(is ? "-fx-background-color: #4f8cff;" : zebraStyle(row.getIndex())));
+            row.selectedProperty().addListener((o,w,is) -> {
+                row.setStyle(is ? 
+                    "-fx-background-color: #4f8cff; -fx-border-color: #99b0f7; -fx-border-radius:10; -fx-background-radius:10; -fx-effect:dropshadow(two-pass-box,#0b1020,12,0.5,0,0);" : 
+                    zebraStyle(row.getIndex(), false));
+            });
             row.hoverProperty().addListener((o,w,is) -> {
-                if (!row.isEmpty() && !row.isSelected()) row.setStyle(is ? "-fx-background-color: rgba(255,255,255,0.09);" : zebraStyle(row.getIndex()));
+                if (!row.isEmpty() && !row.isSelected()) {
+                    row.setStyle(is ? "-fx-background-color: rgba(122,247,195,0.11); -fx-border-radius:10;" : zebraStyle(row.getIndex(), false));
+                }
             });
             return row;
         });
@@ -224,7 +229,6 @@ public class AnnunciView {
 
         root.getChildren().addAll(header, filtersCard, tableCard);
     }
-
     // ============================== DATA ==============================
     private void reloadData() {
         try {
@@ -240,7 +244,7 @@ public class AnnunciView {
             categorie = new ArrayList<>(cats);
             cbCategoria.getItems().setAll(categorie);
             cbCategoria.setPromptText("Tutte le categorie");
-            cbCategoria.setValue(null); // “tutte”
+            cbCategoria.setValue(null); // "tutte"
 
             if (filtered == null) {
                 filtered = new FilteredList<>(masterData, a -> true);
@@ -403,7 +407,7 @@ public class AnnunciView {
         });
     }
 
-    // ============================== Helpers UI ==============================
+ // ============================== Helpers UI FIXED ==============================
     private VBox card() {
         VBox card = new VBox();
         card.setPadding(new Insets(16));
@@ -417,11 +421,13 @@ public class AnnunciView {
         card.setEffect(new DropShadow(24, Color.color(0,0,0,0.45)));
         return card;
     }
+
     private Label l(String s) {
         Label lbl = new Label(s);
         lbl.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px; -fx-font-weight: 800;");
         return lbl;
     }
+
     private TextField styledTextField(String prompt) {
         TextField tf = new TextField();
         tf.setPromptText(prompt);
@@ -435,38 +441,130 @@ public class AnnunciView {
         );
         return tf;
     }
+
+    // FIXED: Styling completo per ComboBox con popup scuro e freccia personalizzata
     private void styleCombo(ComboBox<?> cb) {
         cb.setStyle(
             "-fx-background-color: rgba(255,255,255,0.10);" +
             "-fx-text-fill: #EAF0FF;" +
             "-fx-background-radius: 12;" +
             "-fx-padding: 2 4;" +
-            "-fx-border-color: transparent;"
+            "-fx-border-color: transparent;" +
+            // AGGIUNTO: Styling completo per popup e freccia
+            "-fx-popup-background: rgba(24,27,35,0.95);" +
+            "-fx-selection-bar: #4f8cff;" +
+            "-fx-selection-bar-text: white;"
         );
-        if (cb.getEditor()!=null) {
+        
+        // AGGIUNTO: Styling per l'editor (se editabile)
+        if (cb.getEditor() != null) {
             cb.getEditor().setStyle(
                 "-fx-background-color: transparent;" +
                 "-fx-text-fill: #EAF0FF;" +
                 "-fx-prompt-text-fill: rgba(234,240,255,0.45);"
             );
         }
-    }
-    private <T> void styleComboItems(ComboBox<T> combo) {
-        combo.setCellFactory(lv -> new ListCell<>() {
-            @Override protected void updateItem(T item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty || item==null ? null : String.valueOf(item));
-                setStyle(empty ? "" : "-fx-text-fill: #EAF0FF; -fx-background-color: transparent;");
+
+        // AGGIUNTO: Applica CSS personalizzato per popup scuro e freccia
+        cb.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+            if (newSkin != null) {
+                cb.lookup(".arrow-button").setStyle(
+                    "-fx-background-color: transparent;" +
+                    "-fx-background-radius: 12;" +
+                    "-fx-border-color: transparent;"
+                );
+                cb.lookup(".arrow").setStyle(
+                    "-fx-background-color: #EAF0FF;" +
+                    "-fx-shape: \"M 0 0 h 7 l -3.5 4 z\";" +  // Freccia personalizzata
+                    "-fx-scale-shape: true;" +
+                    "-fx-padding: 2;"
+                );
             }
         });
+    }
+
+    // FIXED: Styling completo per gli items della ComboBox con popup scuro
+    private <T> void styleComboItems(ComboBox<T> combo) {
+        // ButtonCell (quello che si vede quando chiusa)
         combo.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(T item, boolean empty) {
+            @Override 
+            protected void updateItem(T item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item==null ? (combo.getPromptText()==null? "" : combo.getPromptText()) : String.valueOf(item));
+                setText(empty || item == null ? 
+                    (combo.getPromptText() == null ? "" : combo.getPromptText()) : 
+                    String.valueOf(item));
                 setStyle("-fx-text-fill: #EAF0FF; -fx-background-color: transparent;");
             }
         });
+
+        // CellFactory (gli items nel dropdown)
+        combo.setCellFactory(lv -> {
+            ListCell<T> cell = new ListCell<>() {
+                @Override 
+                protected void updateItem(T item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : String.valueOf(item));
+                    
+                    if (empty) {
+                        setStyle("");
+                    } else {
+                        setStyle(
+                            "-fx-text-fill: #EAF0FF;" +
+                            "-fx-background-color: transparent;" +
+                            "-fx-padding: 8 12;" +
+                            "-fx-font-size: 14px;"
+                        );
+                    }
+                }
+            };
+            
+            // AGGIUNTO: Hover effect per gli items
+            cell.setOnMouseEntered(e -> {
+                if (!cell.isEmpty()) {
+                    cell.setStyle(
+                        "-fx-text-fill: white;" +
+                        "-fx-background-color: #4f8cff;" +
+                        "-fx-padding: 8 12;" +
+                        "-fx-font-size: 14px;" +
+                        "-fx-background-radius: 8;"
+                    );
+                }
+            });
+            
+            cell.setOnMouseExited(e -> {
+                if (!cell.isEmpty()) {
+                    cell.setStyle(
+                        "-fx-text-fill: #EAF0FF;" +
+                        "-fx-background-color: transparent;" +
+                        "-fx-padding: 8 12;" +
+                        "-fx-font-size: 14px;"
+                    );
+                }
+            });
+            
+            return cell;
+        });
+
+        // AGGIUNTO: Styling del popup ListView
+        combo.showingProperty().addListener((obs, wasShowing, isShowing) -> {
+            if (isShowing) {
+                // Trova e stylizza il popup
+                combo.getScene().getRoot().lookupAll(".list-view").forEach(node -> {
+                    if (node instanceof ListView) {
+                        node.setStyle(
+                            "-fx-background-color: rgba(24,27,35,0.98);" +
+                            "-fx-background-radius: 12;" +
+                            "-fx-border-color: rgba(255,255,255,0.15);" +
+                            "-fx-border-width: 1;" +
+                            "-fx-border-radius: 12;" +
+                            "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 10, 0, 0, 2);"
+                        );
+                    }
+                });
+            }
+        });
     }
+
     private Button primaryButton(String text, Runnable action) {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
@@ -485,6 +583,7 @@ public class AnnunciView {
         ));
         return b;
     }
+
     private Button ghostButton(String text, Runnable action) {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
@@ -515,18 +614,39 @@ public class AnnunciView {
         ));
         return b;
     }
+    
+    // ============================== TABELLA (COLORI AGGIORNATI) ==============================
     private void styleTable(TableView<?> tv) {
         tv.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        // AGGIORNATO: Utilizzando i colori della ListaAnnunciView
         tv.setStyle(
             "-fx-background-color: transparent;" +
-            "-fx-control-inner-background: rgba(255,255,255,0.04);" +
+            "-fx-control-inner-background: #181b23;" +  // Cambiato da rgba(255,255,255,0.04)
             "-fx-background-insets: 0;" +
             "-fx-text-fill: #EAF0FF;" +
             "-fx-selection-bar: #4f8cff;" +
             "-fx-selection-bar-text: white;" +
-            "-fx-selection-bar-non-focused: #3b6fe0;"
+            "-fx-selection-bar-non-focused: #3b6fe0;" +
+            "-fx-table-header-background: #101218;"  // Aggiunto per gli header
         );
+        
+        // Aggiunto: Styling per gli header delle colonne
+        tv.skinProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                for (TableColumn<?, ?> col : tv.getColumns()) {
+                    col.setStyle(
+                        "-fx-background-color: #101218; " +
+                        "-fx-text-fill: #ffffff; " +
+                        "-fx-font-weight: 900; " +
+                        "-fx-font-size: 15px; " +
+                        "-fx-border-width: 0 0 2 0; " +
+                        "-fx-border-color: #27304a;"
+                    );
+                }
+            }
+        });
     }
+    
     private TableCell<Annuncio, Double> priceCell() {
         DecimalFormatSymbols s = new DecimalFormatSymbols(Locale.ITALY);
         s.setDecimalSeparator(',');
@@ -540,6 +660,7 @@ public class AnnunciView {
             }
         };
     }
+    
     private TableCell<Annuncio, String> badgeCell() {
         return new TableCell<>() {
             @Override protected void updateItem(String stato, boolean empty) {
@@ -569,12 +690,15 @@ public class AnnunciView {
             }
         };
     }
-    private String zebraStyle(int index) {
-        if (index < 0) return "-fx-background-color: rgba(255,255,255,0.04);";
-        return (index % 2 == 0)
-                ? "-fx-background-color: rgba(255,255,255,0.04);"
-                : "-fx-background-color: rgba(255,255,255,0.07);";
+    
+    // AGGIORNATO: Colori zebra da ListaAnnunciView
+    private String zebraStyle(int idx, boolean selected) {
+        if (selected) return "-fx-background-color: #4f8cff; -fx-effect:dropshadow(two-pass-box,#0b1020,8,0.25,0,0);";
+        return idx % 2 == 0 ?
+                "-fx-background-color: rgba(255,255,255,0.03);" :
+                "-fx-background-color: rgba(122,247,195,0.09);";
     }
+    
     private void applyNumericFormatter(TextField tf) {
         UnaryOperator<TextFormatter.Change> filter = change -> {
             String newText = change.getControlNewText();
@@ -589,11 +713,16 @@ public class AnnunciView {
         };
         tf.setTextFormatter(new TextFormatter<>(conv, null, filter));
     }
+    
     private void warn(String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
         a.setHeaderText(null);
         a.showAndWait();
     }
+    
+    public void mostraCreaAnnuncioDialog() {
+    	openDialog(null);
+    	}
 
     public VBox getRoot() { return root; }
 }
