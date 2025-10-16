@@ -1,12 +1,11 @@
 package Controller;
 
 import javafx.collections.FXCollections;
-
 import java.util.*;
 import javafx.collections.ObservableList;
+import javafx.scene.chart.XYChart; // <-- IMPORT AGGIUNTO
 import model.*;
 import service.Service;
-import model.*;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -53,7 +52,7 @@ public class Controller {
     }
 
     // -------------------- AUTH: Registrazione --------------------
- // Ottiene solo le offerte inviate dall'utente (non ricevute)
+    // Ottiene solo le offerte inviate dall'utente (non ricevute)
     public List<Offerta> getOfferteInviateByUtente(String matricola) throws SQLException {
         return service.getOfferteInviateByUtente(matricola);
     }
@@ -104,43 +103,40 @@ public class Controller {
         }
     }
     
-public List<String> getNotificheUtente(String matricola) {
-    List<String> notif = new ArrayList<>();
-    try {
-        // 1. Ottieni i tuoi annunci
-        List<Annuncio> mieiAnnunci = getAnnunciByUtente(matricola);
-        int offerteRicevute = 0;
-        
-        // 2. Per ogni annuncio, carica le sue offerte e filtra quelle "inviata"
-        for (Annuncio a : mieiAnnunci) {
-            List<Offerta> offerteSuAnnuncio = service.getOfferteByCodiceAnnuncio(a.getCodiceAnnuncio()); // <-- serve/implementa questo metodo se non esiste!
-            for (Offerta o : offerteSuAnnuncio) {
-                if ("inviata".equalsIgnoreCase(o.getStato())) {
-                    offerteRicevute++;
+    public List<String> getNotificheUtente(String matricola) {
+        List<String> notif = new ArrayList<>();
+        try {
+            // 1. Ottieni i tuoi annunci
+            List<Annuncio> mieiAnnunci = getAnnunciByUtente(matricola);
+            int offerteRicevute = 0;
+            
+            // 2. Per ogni annuncio, carica le sue offerte e filtra quelle "inviata"
+            for (Annuncio a : mieiAnnunci) {
+                List<Offerta> offerteSuAnnuncio = service.getOfferteByCodiceAnnuncio(a.getCodiceAnnuncio()); // <-- serve/implementa questo metodo se non esiste!
+                for (Offerta o : offerteSuAnnuncio) {
+                    if ("inviata".equalsIgnoreCase(o.getStato())) {
+                        offerteRicevute++;
+                    }
                 }
             }
-        }
-        if (offerteRicevute > 0)
-            notif.add("Hai " + offerteRicevute + " offerte ricevute da accettare.");
+            if (offerteRicevute > 0)
+                notif.add("Hai " + offerteRicevute + " offerte ricevute da accettare.");
 
-        // Annunci scaduti (già va bene come hai)
-        int annunciScaduti = 0;
-        for (Annuncio a : mieiAnnunci) {
-            if ("scaduto".equalsIgnoreCase(a.getStato())) {
-                annunciScaduti++;
+            // Annunci scaduti (già va bene come hai)
+            int annunciScaduti = 0;
+            for (Annuncio a : mieiAnnunci) {
+                if ("scaduto".equalsIgnoreCase(a.getStato())) {
+                    annunciScaduti++;
+                }
             }
+            if (annunciScaduti > 0)
+                notif.add("Hai " + annunciScaduti + " annunci scaduti.");
+
+        } catch (Exception e) {
+            notif.add("Errore nel caricamento notifiche.");
         }
-        if (annunciScaduti > 0)
-            notif.add("Hai " + annunciScaduti + " annunci scaduti.");
-
-    } catch (Exception e) {
-        notif.add("Errore nel caricamento notifiche.");
+        return notif;
     }
-    return notif;
-}
-
-
-
 
     /**
      * Restituisce l'utente correntemente loggato (può essere null).
@@ -271,50 +267,7 @@ public List<String> getNotificheUtente(String matricola) {
             return false;
         }
     }
- // =========================================================
- // == STATISTICHE (bridge verso Service)
- // =========================================================
-
- /** Totale offerte complessive. */
- public int getTotaleOfferte() {
-     try {
-         return service.getTotaleOfferte();
-     } catch (SQLException e) {
-         showError("Errore getTotaleOfferte: " + e.getMessage());
-         return 0;
-     }
- }
-
- /** Totale offerte per tipologia (es. "vendita", "scambio", ...). */
- public int getTotaleOffertePerTipologia(String tipologia) {
-     try {
-         return service.getTotaleOffertePerTipologia(tipologia);
-     } catch (SQLException e) {
-         showError("Errore getTotaleOffertePerTipologia: " + e.getMessage());
-         return 0;
-     }
- }
-
- /** Offerte accettate per tipologia. */
- public int getOfferteAccettatePerTipologia(String tipologia) {
-     try {
-         return service.getOfferteAccettatePerTipologia(tipologia);
-     } catch (SQLException e) {
-         showError("Errore getOfferteAccettatePerTipologia: " + e.getMessage());
-         return 0;
-     }
- }
-
- /** Eventuali statistiche aggiuntive lato service (se ti servono). */
- public double[] getStatisticheVenditeAccettate() {
-     try {
-         return service.getStatisticheVenditeAccettate();
-     } catch (SQLException e) {
-         showError("Errore getStatisticheVenditeAccettate: " + e.getMessage());
-         return new double[0];
-     }
- }
-
+    
     // =========================================================
     // == OGGETTI
     // =========================================================
@@ -351,6 +304,74 @@ public List<String> getNotificheUtente(String matricola) {
     public boolean eliminaOfferta(String codiceOfferta) throws SQLException {
         return service.eliminaOfferta(codiceOfferta);
     }
+    
+    // =========================================================
+    // == NUOVI METODI PER REPORTVIEW (INIZIO)
+    // =========================================================
+
+    public Map<String, Integer> getStatisticheGenerali(boolean sempre) throws SQLException {
+        // TODO: Implementare la logica nel Service (e DAO) per recuperare le statistiche
+        // Questa è solo una implementazione di esempio con dati fittizi.
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("annunci", 18);
+        stats.put("offerteInviate", 27);
+        // Tasso di successo come intero (es. 35 per 35%)
+        stats.put("tassoSuccesso", 35);
+        return stats;
+    }
+
+    public Map<String, Integer> getDatiGraficoTortaTipologie() throws SQLException {
+        // TODO: Implementare la logica nel Service (e DAO)
+        Map<String, Integer> dati = new HashMap<>();
+        dati.put("Vendita", 10);
+        dati.put("Scambio", 5);
+        dati.put("Regalo", 3);
+        return dati;
+    }
+
+    public Map<String, Integer> getDatiGraficoBarreOfferte() throws SQLException {
+        // TODO: Implementare la logica nel Service (e DAO)
+        Map<String, Integer> dati = new HashMap<>();
+        dati.put("InviateVendita", 15);
+        dati.put("InviateScambio", 8);
+        dati.put("InviateRegalo", 4);
+        dati.put("RicevuteVendita", 12);
+        dati.put("RicevuteScambio", 10);
+        dati.put("RicevuteRegalo", 2);
+        return dati;
+    }
+    
+    public Map<String, XYChart.Series<String, Number>> getDatiGraficoAndamento() throws SQLException {
+        // TODO: Implementare la logica nel Service (e DAO) per l'andamento degli ultimi 30 giorni
+        Map<String, XYChart.Series<String, Number>> dati = new HashMap<>();
+        
+        XYChart.Series<String, Number> annunciSeries = new XYChart.Series<>();
+        annunciSeries.setName("Annunci Pubblicati");
+        // Dati di esempio
+        annunciSeries.getData().add(new XYChart.Data<>("1 Mag", 1));
+        annunciSeries.getData().add(new XYChart.Data<>("5 Mag", 3));
+        annunciSeries.getData().add(new XYChart.Data<>("12 Mag", 5));
+        annunciSeries.getData().add(new XYChart.Data<>("20 Mag", 8));
+        annunciSeries.getData().add(new XYChart.Data<>("28 Mag", 10));
+
+        XYChart.Series<String, Number> offerteSeries = new XYChart.Series<>();
+        offerteSeries.setName("Offerte Inviate");
+        // Dati di esempio
+        offerteSeries.getData().add(new XYChart.Data<>("1 Mag", 2));
+        offerteSeries.getData().add(new XYChart.Data<>("5 Mag", 5));
+        offerteSeries.getData().add(new XYChart.Data<>("12 Mag", 8));
+        offerteSeries.getData().add(new XYChart.Data<>("20 Mag", 12));
+        offerteSeries.getData().add(new XYChart.Data<>("28 Mag", 15));
+
+        dati.put("annunci", annunciSeries);
+        dati.put("offerte", offerteSeries);
+        
+        return dati;
+    }
+
+    // =========================================================
+    // == NUOVI METODI PER REPORTVIEW (FINE)
+    // =========================================================
 
     // =========================================================
     // == UTILITY INTERNE

@@ -1,292 +1,285 @@
 package gui;
 
 import Controller.Controller;
-import javafx.embed.swing.SwingNode;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
-import javafx.stage.Window;
-import javafx.application.Platform;
-import javafx.concurrent.Task;
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.ChartPanel;
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.data.category.DefaultCategoryDataset;
+import javafx.geometry.Pos;
+import javafx.scene.chart.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import model.Annuncio;
+import model.Offerta;
 
-import javax.imageio.ImageIO;
-import javax.swing.SwingUtilities;
-import java.awt.Dimension;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.LinkedHashMap;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/** ReportView embeddabile: si aggiorna automaticamente e mostra un loader durante il fetch. */
 public class ReportView {
 
+    private VBox root;
     private final Controller controller;
 
-    // root e contenitori
-    private final BorderPane root = new BorderPane();
-    private StackPane chartHost;
-    private ProgressIndicator loader;
+    // UI Elements
+    private ComboBox<String> cbPeriodo;
+    private PieChart pieChartTipologie;
+    private BarChart<String, Number> barChartOfferte;
+    private LineChart<String, Number> lineChartAndamento;
 
-    // UI numeri
-    private Label lblTotaleOfferte;
-    private Label lblVenditaTot, lblScambioTot, lblVenditaAcc, lblScambioAcc;
+    // Statistiche Veloci
+    private Label lblTotAnnunciValue;
+    private Label lblTotOfferteInviateValue;
+    private Label lblTassoSuccessoValue;
 
-    // Tipologie
-    private final String[] TIPI = new String[]{"vendita", "scambio"};
-
-    // dati
-    private final Map<String, Integer> totaliPerTipo = new LinkedHashMap<>();
-    private final Map<String, Integer> accettatePerTipo = new LinkedHashMap<>();
-
-    // grafico
-    private DefaultCategoryDataset dataset;
-    private JFreeChart chart;
-    private ChartPanel chartPanel;
 
     public ReportView(Controller controller) {
         this.controller = controller;
-        buildUI();
-        loadDataAsync(); // carica subito
-
-        // quando viene agganciata una Scene, rilancia un ciclo di layout + refresh
-        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                Platform.runLater(() -> {
-                    root.applyCss();
-                    root.layout();
-                    loadDataAsync();
-                });
-            }
-        });
+        createUI();
+        loadStatistiche();
     }
 
-    public Pane getRoot() {
-        return root;
-    }
-
-    private void buildUI() {
+    private void createUI() {
+        root = new VBox(16);
         root.setPadding(new Insets(16));
-
-        // Top
-        VBox topBox = new VBox(6);
-        Label title = new Label("Statistiche & Report");
-        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
-        ToolBar toolbar = new ToolBar();
-        Button btnExportCsv = new Button("Esporta CSV");
-        Button btnSavePng = new Button("Salva Grafico (PNG)");
-        toolbar.getItems().addAll(btnExportCsv, btnSavePng);
-        topBox.getChildren().addAll(title, toolbar);
-        root.setTop(topBox);
-
-        // Left
-        VBox left = buildNumbersPane();
-        root.setLeft(left);
-
-        // Center: grafico + loader
-        SwingNode swingNode = new SwingNode();
-        dataset = new DefaultCategoryDataset();
-        chart = ChartFactory.createBarChart(
-                "Offerte per tipologia",
-                "Tipologia",
-                "Numero",
-                dataset,
-                PlotOrientation.VERTICAL,
-                true, true, false
+        root.setStyle(
+            "-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);" +
+            "-fx-font-family: 'Segoe UI','Roboto','Arial';"
         );
-        chartPanel = new ChartPanel(chart);
-        chartPanel.setPreferredSize(new Dimension(700, 480)); // aiuta layout immediato
 
-        chartHost = new StackPane();
-        chartHost.setPadding(new Insets(8));
-        SwingUtilities.invokeLater(() -> {
-            swingNode.setContent(chartPanel);
-            // 👇 forza subito un paint Swing
-            chartPanel.revalidate();
-            chartPanel.repaint();
-        });
-        chartHost.getChildren().add(swingNode);
+        // Header
+        Label title = new Label("Statistiche & Report");
+        title.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 20px; -fx-font-weight: 900;");
 
-        loader = new ProgressIndicator();
-        loader.setMaxSize(90, 90);
-        loader.setVisible(false);
-        chartHost.getChildren().add(loader);
+        // Filtri
+        HBox filtriBox = new HBox(10);
+        filtriBox.setAlignment(Pos.CENTER_LEFT);
+        cbPeriodo = new ComboBox<>();
+        cbPeriodo.getItems().addAll("Sempre");
+        cbPeriodo.setValue("Sempre");
+        styleCombo(cbPeriodo);
+        styleComboItems(cbPeriodo);
+        
+        Button btnAggiorna = primaryButton("Aggiorna", this::loadStatistiche);
+        Label lblPeriodo = new Label("Periodo:");
+        lblPeriodo.setStyle("-fx-text-fill: #EAF0FF;");
+        filtriBox.getChildren().addAll(lblPeriodo, cbPeriodo, btnAggiorna);
 
-        root.setCenter(chartHost);
 
-        // actions
-        btnExportCsv.setOnAction(e -> exportCsv());
-        btnSavePng.setOnAction(e -> saveChartPng());
+        // Statistiche Veloci
+        GridPane statsGrid = new GridPane();
+        statsGrid.setHgap(40);
+        statsGrid.setVgap(10);
+        
+        lblTotAnnunciValue = new Label("0");
+        lblTotOfferteInviateValue = new Label("0");
+        lblTassoSuccessoValue = new Label("0%");
 
-        // 👇 forzo anche un primo layout lato FX, appena creato il centro
-        Platform.runLater(() -> {
-            root.applyCss();
-            root.layout();
-        });
+        statsGrid.add(createStatPane("Annunci Totali", lblTotAnnunciValue), 0, 0);
+        statsGrid.add(createStatPane("Offerte Inviate", lblTotOfferteInviateValue), 1, 0);
+        statsGrid.add(createStatPane("Tasso Successo Offerte", lblTassoSuccessoValue), 2, 0);
+
+        VBox statsCard = card();
+        statsCard.getChildren().add(statsGrid);
+
+
+        // Grafici
+        pieChartTipologie = new PieChart();
+        stylePieChart(pieChartTipologie, "Distribuzione Annunci per Tipologia");
+
+        CategoryAxis xAxisBar = new CategoryAxis();
+        NumberAxis yAxisBar = new NumberAxis();
+        barChartOfferte = new BarChart<>(xAxisBar, yAxisBar);
+        styleBarChart(barChartOfferte, "Confronto Offerte Inviate vs Ricevute");
+
+        CategoryAxis xAxisLine = new CategoryAxis();
+        NumberAxis yAxisLine = new NumberAxis();
+        lineChartAndamento = new LineChart<>(xAxisLine, yAxisLine);
+        styleLineChart(lineChartAndamento, "Andamento Annunci/Offerte (Funzionalità da implementare)");
+
+
+        // Layout grafici
+        GridPane chartsGrid = new GridPane();
+        chartsGrid.setHgap(16);
+        chartsGrid.setVgap(16);
+
+        VBox pieCard = card();
+        pieCard.getChildren().add(pieChartTipologie);
+        chartsGrid.add(pieCard, 0, 0);
+
+        VBox barCard = card();
+        barCard.getChildren().add(barChartOfferte);
+        chartsGrid.add(barCard, 1, 0);
+        
+        VBox lineCard = card();
+        lineCard.getChildren().add(lineChartAndamento);
+        GridPane.setColumnSpan(lineCard, 2);
+        chartsGrid.add(lineCard, 0, 1);
+
+
+        root.getChildren().addAll(title, filtriBox, statsCard, chartsGrid);
     }
 
-    private VBox buildNumbersPane() {
-        VBox box = new VBox(8);
-        box.setPadding(new Insets(8));
-        box.setPrefWidth(320);
-        box.setStyle("-fx-background-color: #20202010; -fx-border-color: #cccccc; -fx-border-radius: 6; -fx-background-radius: 6;");
-
-        Label section = new Label("Statistiche numeriche");
-        section.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
-
-        lblTotaleOfferte = new Label("-");
-        lblVenditaTot = new Label("-");
-        lblScambioTot = new Label("-");
-        lblVenditaAcc = new Label("-");
-        lblScambioAcc = new Label("-");
-
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(6);
-        int r = 0;
-        grid.add(new Label("Totale offerte:"), 0, r); grid.add(lblTotaleOfferte, 1, r++);
-        grid.add(new Label("Totale VENDITA:"), 0, r); grid.add(lblVenditaTot, 1, r++);
-        grid.add(new Label("Accettate VENDITA:"), 0, r); grid.add(lblVenditaAcc, 1, r++);
-        grid.add(new Label("Totale SCAMBIO:"), 0, r); grid.add(lblScambioTot, 1, r++);
-        grid.add(new Label("Accettate SCAMBIO:"), 0, r); grid.add(lblScambioAcc, 1, r++);
-
-        box.getChildren().addAll(section, new Separator(), grid);
-        return box;
-    }
-
-    /** Carica i dati in background e aggiorna la UI al termine. */
-    private void loadDataAsync() {
-        showLoader(true);
-
-        Task<StatsData> task = new Task<>() {
-            @Override
-            protected StatsData call() {
-                StatsData data = new StatsData();
-                data.totale = controller.getTotaleOfferte();
-                data.totaliPerTipo = new LinkedHashMap<>();
-                data.accettatePerTipo = new LinkedHashMap<>();
-                for (String t : TIPI) {
-                    data.totaliPerTipo.put(t, controller.getTotaleOffertePerTipologia(t));
-                    data.accettatePerTipo.put(t, controller.getOfferteAccettatePerTipologia(t));
-                }
-                return data;
-            }
-        };
-
-        task.setOnSucceeded(ev -> {
-            StatsData d = task.getValue();
-            totaliPerTipo.clear(); totaliPerTipo.putAll(d.totaliPerTipo);
-            accettatePerTipo.clear(); accettatePerTipo.putAll(d.accettatePerTipo);
-
-            lblTotaleOfferte.setText(String.valueOf(d.totale));
-            lblVenditaTot.setText(String.valueOf(totaliPerTipo.getOrDefault("vendita", 0)));
-            lblVenditaAcc.setText(String.valueOf(accettatePerTipo.getOrDefault("vendita", 0)));
-            lblScambioTot.setText(String.valueOf(totaliPerTipo.getOrDefault("scambio", 0)));
-            lblScambioAcc.setText(String.valueOf(accettatePerTipo.getOrDefault("scambio", 0)));
-
-            refreshDataset();
-            showLoader(false);
-
-            // 👇 forza layout FX e repaint Swing dopo update dataset
-            Platform.runLater(() -> {
-                root.applyCss();
-                root.layout();
-                chartHost.requestLayout();
-            });
-            SwingUtilities.invokeLater(() -> {
-                chartPanel.revalidate();
-                chartPanel.repaint();
-            });
-        });
-
-        task.setOnFailed(ev -> {
-            showLoader(false);
-            Throwable ex = task.getException();
-            showError("Errore caricamento statistiche: " + (ex != null ? ex.getMessage() : "sconosciuto"));
-        });
-
-        new Thread(task, "ReportView-Loader").start();
-    }
-
-    private void refreshDataset() {
-        SwingUtilities.invokeLater(() -> {
-            dataset.clear();
-            for (Map.Entry<String, Integer> e : totaliPerTipo.entrySet()) {
-                dataset.addValue(e.getValue(), "Totali", e.getKey().toUpperCase());
-            }
-            for (Map.Entry<String, Integer> e : accettatePerTipo.entrySet()) {
-                dataset.addValue(e.getValue(), "Accettate", e.getKey().toUpperCase());
-            }
-            chart.setTitle("Offerte per tipologia (Totali vs Accettate)");
-            if (chartPanel != null) {
-                chartPanel.revalidate();
-                chartPanel.repaint();
-            }
-        });
-    }
-
-    private void exportCsv() {
-        FileChooser fc = new FileChooser();
-        fc.setTitle("Esporta statistiche (CSV)");
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
-        fc.setInitialFileName("report_statistiche.csv");
-        Window owner = root.getScene() == null ? null : root.getScene().getWindow();
-        File f = fc.showSaveDialog(owner);
-        if (f == null) return;
-
-        try (FileWriter w = new FileWriter(f)) {
-            w.write("Tipologia,Totali,Accettate\n");
-            for (String t : TIPI) {
-                int tot = totaliPerTipo.getOrDefault(t, 0);
-                int acc = accettatePerTipo.getOrDefault(t, 0);
-                w.write(t + "," + tot + "," + acc + "\n");
-            }
-            int sommaTot = totaliPerTipo.values().stream().mapToInt(Integer::intValue).sum();
-            int sommaAcc = accettatePerTipo.values().stream().mapToInt(Integer::intValue).sum();
-            w.write("TOTALE," + sommaTot + "," + sommaAcc + "\n");
-        } catch (IOException ex) {
-            showError("Errore export CSV: " + ex.getMessage());
-        }
-    }
-
-    private void saveChartPng() {
-        FileChooser fc = new FileChooser();
-        fc.setTitle("Salva grafico (PNG)");
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG", "*.png"));
-        fc.setInitialFileName("grafico_offerte.png");
-        Window owner = root.getScene() == null ? null : root.getScene().getWindow();
-        File f = fc.showSaveDialog(owner);
-        if (f == null) return;
-
+    private void loadStatistiche() {
         try {
-            BufferedImage img = chart.createBufferedImage(1200, 700);
-            ImageIO.write(img, "png", f);
-        } catch (IOException ex) {
-            showError("Errore salvataggio PNG: " + ex.getMessage());
+            String matricola = controller.getUtenteCorrente().getMatricola();
+
+            // --- Statistiche Veloci ---
+            List<Annuncio> annunci = controller.getAnnunciByUtente(matricola);
+            List<Offerta> offerteInviate = controller.getOfferteInviateByUtente(matricola);
+
+            lblTotAnnunciValue.setText(String.valueOf(annunci.size()));
+            lblTotOfferteInviateValue.setText(String.valueOf(offerteInviate.size()));
+            
+            long offerteAccettate = offerteInviate.stream().filter(o -> "accettata".equalsIgnoreCase(o.getStato())).count();
+            double tassoSuccesso = (offerteInviate.isEmpty()) ? 0.0 : (double) offerteAccettate / offerteInviate.size();
+            lblTassoSuccessoValue.setText(String.format("%.1f%%", tassoSuccesso * 100));
+
+
+            // --- Dati per Grafico a Torta ---
+            Map<String, Integer> annunciPerTipo = new HashMap<>();
+            for (Annuncio a : annunci) {
+                annunciPerTipo.merge(a.getTipologia(), 1, Integer::sum);
+            }
+            ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
+            for (Map.Entry<String, Integer> entry : annunciPerTipo.entrySet()) {
+                pieChartData.add(new PieChart.Data(entry.getKey(), entry.getValue()));
+            }
+            pieChartTipologie.setData(pieChartData);
+
+
+            // --- Dati per Grafico a Barre ---
+            List<Offerta> offerteRicevute = controller.getOfferteRicevuteByUtente(matricola);
+
+            XYChart.Series<String, Number> seriesInviate = new XYChart.Series<>();
+            seriesInviate.setName("Offerte Inviate");
+            seriesInviate.getData().add(new XYChart.Data<>("Totale", offerteInviate.size()));
+
+            XYChart.Series<String, Number> seriesRicevute = new XYChart.Series<>();
+            seriesRicevute.setName("Offerte Ricevute");
+            seriesRicevute.getData().add(new XYChart.Data<>("Totale", offerteRicevute.size()));
+            barChartOfferte.getData().setAll(seriesInviate, seriesRicevute);
+
+            // --- Dati per Grafico a Linee (Placeholder) ---
+            lineChartAndamento.getData().clear();
+
+        } catch (SQLException e) {
+            warn("Errore nel caricamento delle statistiche: " + e.getMessage());
         }
     }
 
-    private void showLoader(boolean show) {
-        loader.setVisible(show);
-        chartHost.setDisable(show);
+    private VBox createStatPane(String title, Label valueLabel) {
+        VBox pane = new VBox(5);
+        pane.setAlignment(Pos.CENTER);
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px;");
+        valueLabel.setStyle("-fx-text-fill: #FFFFFF; -fx-font-size: 22px; -fx-font-weight: 700;");
+        pane.getChildren().addAll(titleLabel, valueLabel);
+        return pane;
     }
 
-    private void showError(String msg) {
-        Alert a = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
-        a.setHeaderText("Errore");
+
+    // ============================== Helpers UI ==============================
+    private VBox card() {
+        VBox card = new VBox();
+        card.setPadding(new Insets(16));
+        card.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.06);" +
+            "-fx-background-radius: 18;" +
+            "-fx-border-radius: 18;" +
+            "-fx-border-color: rgba(255,255,255,0.10);" +
+            "-fx-border-width: 1;"
+        );
+        card.setEffect(new DropShadow(24, Color.color(0,0,0,0.45)));
+        return card;
+    }
+
+    private Button primaryButton(String text, Runnable action) {
+        Button b = new Button(text);
+        b.setOnAction(e -> action.run());
+        b.setStyle(
+            "-fx-background-color: #4f8cff;" +
+            "-fx-text-fill: white;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-weight: 700;"
+        );
+        return b;
+    }
+    
+    private void styleCombo(ComboBox<?> cb) {
+        cb.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.10);" +
+            "-fx-text-fill: #EAF0FF;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 2 4;" +
+            "-fx-border-color: transparent;"
+        );
+    }
+    
+    private <T> void styleComboItems(ComboBox<T> combo) {
+        combo.setButtonCell(new ListCell<>() {
+            @Override 
+            protected void updateItem(T item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : String.valueOf(item));
+                setStyle("-fx-text-fill: #EAF0FF; -fx-background-color: transparent;");
+            }
+        });
+    }
+
+    private void stylePieChart(PieChart chart, String title) {
+        chart.setTitle(title);
+        chart.setLabelLineLength(20);
+        chart.setLegendVisible(true);
+        chart.setStyle(
+            "-fx-background-color: transparent;" +
+            ".chart-title { -fx-text-fill: #EAF0FF; -fx-font-size: 14px; -fx-font-weight: bold; }" +
+            ".chart-pie-label { -fx-fill: #EAF0FF; -fx-font-size: 11px; }" +
+            ".chart-legend { -fx-background-color: transparent; }"
+        );
+    }
+
+    private void styleBarChart(BarChart<String, Number> chart, String title) {
+        chart.setTitle(title);
+        chart.setLegendVisible(true);
+        chart.setStyle(
+            "-fx-background-color: transparent;" +
+            ".chart-title { -fx-text-fill: #EAF0FF; -fx-font-size: 14px; -fx-font-weight: bold; }" +
+            ".chart-legend { -fx-background-color: transparent; }"
+        );
+        chart.getXAxis().setStyle("-fx-tick-label-fill: #A8B1C6;");
+        chart.getYAxis().setStyle("-fx-tick-label-fill: #A8B1C6;");
+    }
+    
+    private void styleLineChart(LineChart<String, Number> chart, String title) {
+        chart.setTitle(title);
+        chart.setLegendVisible(true);
+        chart.setStyle(
+            "-fx-background-color: transparent;" +
+            ".chart-title { -fx-text-fill: #EAF0FF; -fx-font-size: 14px; -fx-font-weight: bold; }" +
+            ".chart-legend { -fx-background-color: transparent; }"
+        );
+        chart.getXAxis().setStyle("-fx-tick-label-fill: #A8B1C6;");
+        chart.getYAxis().setStyle("-fx-tick-label-fill: #A8B1C6;");
+    }
+
+    private void warn(String msg) {
+        Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
+        a.setHeaderText(null);
         a.showAndWait();
     }
 
-    private static class StatsData {
-        int totale;
-        Map<String, Integer> totaliPerTipo;
-        Map<String, Integer> accettatePerTipo;
+    public VBox getRoot() {
+        return root;
     }
 }
