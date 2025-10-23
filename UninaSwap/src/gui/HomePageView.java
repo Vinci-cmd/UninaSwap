@@ -19,10 +19,12 @@ public class HomePageView {
     private HBox root;
     private final Controller controller;
     private final Stage stage; // aggiunto per il logout
+    private VBox tableCard;
 
     private SideMenuView sideMenu;
 
     public HomePageView(Stage stage, Controller controller) {
+    	
         this.controller = controller;
         this.stage = stage;
         createUI();
@@ -113,9 +115,11 @@ public class HomePageView {
         Button logout = ghostButton("Logout", () -> {
             controller.logout(); // azzera sessione utente se serve
             LoginView loginView = new LoginView(stage, controller);
-            Scene loginScene = new Scene(loginView.getRoot(), 560, 450);
+            Scene loginScene = new Scene(loginView.getRoot(), stage.getWidth(), stage.getHeight()); // Mantieni altezza/larghezza attuali!
             stage.setScene(loginScene);
             stage.setTitle("UninaSwap - Login");
+            // Se vuoi anche massimizzare dopo il logout, aggiungi questa riga:
+            stage.setMaximized(true);
         });
 
         header.getChildren().addAll(brand, sub, spacer, logout);

@@ -298,11 +298,16 @@ public class LoginView {
     }
 
     private void goHome() {
-        HomePageView homepage = new HomePageView(stage,controller);
-        // Stage sempre presente!
-        stage.setScene(new Scene(homepage.getRoot(), 1000, 700));
+        HomePageView homepage = new HomePageView(stage, controller);
+        // Usa le dimensioni attuali dello stage
+        double w = stage.getWidth();
+        double h = stage.getHeight();
+        Scene homeScene = new Scene(homepage.getRoot(), w, h);
+        stage.setScene(homeScene);
         stage.setTitle("UninaSwap - Dashboard");
+        stage.setMaximized(true); // Così resta o ritorna massimizzata
     }
+
 
     private Label smallLabel(String text) {
         Label l = new Label(text);

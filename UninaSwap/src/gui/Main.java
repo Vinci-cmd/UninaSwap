@@ -22,8 +22,8 @@ public class Main extends Application {
             Scene scene = new Scene(loginView.getRoot(), 560, 450);
             primaryStage.setScene(scene);
             primaryStage.setTitle("UninaSwap - Login");
+            primaryStage.setMaximized(true); // AGGIUNGI QUI
             primaryStage.show();
-
             // Sarà la LoginView (dopo il login) a creare l'HomePageView col suo costruttore:
             // new HomePageView(primaryStage, controller);
 
