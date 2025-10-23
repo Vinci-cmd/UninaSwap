@@ -6,6 +6,7 @@ public class Oggetto {
     private String descrizione;
     private String categoria;
     private String codiceAnnuncio; // riferimento all'annuncio a cui appartiene
+    private String matricola;
 
     public Oggetto(String codiceOggetto, String nome, String descrizione, String categoria, String codiceAnnuncio) {
         this.codiceOggetto = codiceOggetto;
@@ -29,4 +30,7 @@ public class Oggetto {
 
     public String getCodiceAnnuncio() { return codiceAnnuncio; }
     public void setCodiceAnnuncio(String codiceAnnuncio) { this.codiceAnnuncio = codiceAnnuncio; }
+    
+    public String getMatricola() { return matricola; }
+    public void setMatricola(String matricola) { this.matricola = matricola; }
 }

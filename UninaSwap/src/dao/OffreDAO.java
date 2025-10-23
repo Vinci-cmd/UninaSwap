@@ -45,6 +45,8 @@ public class OffreDAO {
         return lista;
     }
 
+    
+    
     // Elimina un'associazione offerta-oggetto
     public boolean eliminaOffre(String codiceOfferta, String codiceOggetto) throws SQLException {
         String sql = "DELETE FROM offre WHERE codiceofferta = ? AND codiceoggetto = ?";
@@ -54,4 +56,5 @@ public class OffreDAO {
             return ps.executeUpdate() == 1;
         }
     }
+
 }
