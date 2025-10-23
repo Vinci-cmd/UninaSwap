@@ -20,7 +20,7 @@ import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import model.Annuncio;
+import model.*;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -307,6 +307,34 @@ public class AnnunciView {
         prezzoLabel.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
         prezzo.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
 
+        // ===== AGGIUNTA SELEZIONE OGGETTO (solo oggetti non associati) =====
+        ComboBox<model.Oggetto> oggettiBox = new ComboBox<>();
+        try {
+            List<model.Oggetto> tuttiOggetti = controller.getOggettiByUtente(controller.getUtenteCorrente().getMatricola());
+            // Filtra solo oggetti NON associati ad annunci (codiceAnnuncio è NULL o vuoto)
+            List<model.Oggetto> oggettiDisponibili = tuttiOggetti.stream()
+                .filter(o -> o.getCodiceAnnuncio() == null || o.getCodiceAnnuncio().isEmpty())
+                .toList();
+            
+            oggettiBox.getItems().setAll(oggettiDisponibili);
+            oggettiBox.setPromptText("Seleziona oggetto da associare");
+            oggettiBox.setCellFactory(list -> new ListCell<>() {
+                @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+                }
+            });
+            oggettiBox.setButtonCell(new ListCell<>() {
+                @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+                }
+            });
+        } catch (SQLException e) {
+            warn("Errore nel caricamento oggetti: " + e.getMessage());
+        }
+        // ===================================
+
         ComboBox<String> stateBox = null;
         if (existing != null) {
             stateBox = new ComboBox<>();
@@ -320,6 +348,7 @@ public class AnnunciView {
         form.add(l("Tipologia"), 0, r); form.add(tipBox, 1, r++);
         form.add(l("Descrizione"), 0, r); form.add(desc, 1, r++);
         form.add(prezzoLabel, 0, r); form.add(prezzo, 1, r++);
+        form.add(l("Oggetto"), 0, r); form.add(oggettiBox, 1, r++);
         if (existing != null) { form.add(l("Stato"), 0, r); form.add(stateBox, 1, r); }
 
         HBox btns = new HBox(10);
@@ -336,6 +365,14 @@ public class AnnunciView {
                 return;
             }
 
+            // ===== CONTROLLO OGGETTO OBBLIGATORIO =====
+            model.Oggetto selezionato = oggettiBox.getValue();
+            if (selezionato == null) {
+                warn("Devi associare un tuo oggetto all'annuncio.");
+                return;
+            }
+            // ==========================================
+
             double price = 0.0;
             if ("vendita".equalsIgnoreCase(tip)) {
                 try {
@@ -346,7 +383,7 @@ public class AnnunciView {
             }
             try {
                 if (existing == null) {
-                    controller.creaAnnuncio(categoria, tip, d, price);
+                    controller.creaAnnuncio(categoria, tip, d, price, selezionato.getCodiceOggetto());
                 } else {
                     controller.modificaAnnuncio(existing.getCodiceAnnuncio(), categoria, tip, d, price, finalStateBox.getValue());
                 }
@@ -364,9 +401,10 @@ public class AnnunciView {
         wrap.setPadding(new Insets(16));
         wrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
 
-        dialog.setScene(new Scene(wrap, 520, existing == null ? 330 : 390));
+        dialog.setScene(new Scene(wrap, 520, existing == null ? 380 : 440));
         dialog.showAndWait();
     }
+
 
     private void confirmDelete(Annuncio a) {
         Alert conf = new Alert(Alert.AlertType.CONFIRMATION, "Vuoi eliminare l'annuncio selezionato?", ButtonType.YES, ButtonType.NO);

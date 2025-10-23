@@ -431,58 +431,72 @@ public class ListaAnnunciView {
         }
     }
 
-    private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponibili) {
-        Stage scambioDialog = new Stage();
-        scambioDialog.initModality(Modality.APPLICATION_MODAL);
-        scambioDialog.setTitle("Seleziona oggetti per lo scambio");
+private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponibili) {
+    Stage scambioDialog = new Stage();
+    scambioDialog.initModality(Modality.APPLICATION_MODAL);
+    scambioDialog.setTitle("Seleziona oggetti per lo scambio");
 
-        VBox scambioCard = card();
-        scambioCard.setSpacing(12);
+    VBox scambioCard = card();
+    scambioCard.setSpacing(12);
 
-        Label lblSelect = l("Scegli i tuoi oggetti da proporre nello scambio:");
-        ListView<Oggetto> listOggetti = new ListView<>();
-        listOggetti.getItems().addAll(oggettiDisponibili);
-        listOggetti.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        listOggetti.setCellFactory(lv -> new ListCell<>() {
-            @Override
-            protected void updateItem(Oggetto oggetto, boolean empty) {
-                super.updateItem(oggetto, empty);
-                setText(empty || oggetto == null ? null : oggetto.getNome() + " (" + oggetto.getDescrizione() + ")");
-                setStyle(empty ? "" : "-fx-background-color: transparent; -fx-text-fill: #EAF0FF; -fx-padding: 8;");
+    Label lblSelect = l("Scegli i tuoi oggetti da proporre nello scambio:");
+    ListView<Oggetto> listOggetti = new ListView<>();
+    listOggetti.getItems().addAll(oggettiDisponibili);
+    listOggetti.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+    listOggetti.setCellFactory(lv -> new ListCell<>() {
+        @Override
+        protected void updateItem(Oggetto oggetto, boolean empty) {
+            super.updateItem(oggetto, empty);
+            setText(empty || oggetto == null ? null : oggetto.getNome() + " (" + oggetto.getDescrizione() + ")");
+            if (!empty && isSelected()) {
+                setStyle("-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8;");
+            } else if (!empty) {
+                setStyle("-fx-background-color: transparent; -fx-text-fill: #EAF0FF; -fx-padding: 8;");
+            } else {
+                setStyle("");
             }
-        });
-        listOggetti.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-control-inner-background: transparent; -fx-border-radius: 12; -fx-background-radius: 12;");
-        listOggetti.setPrefHeight(200);
+        }
+    });
+    listOggetti.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-control-inner-background: transparent; -fx-border-radius: 12; -fx-background-radius: 12;");
+    listOggetti.setPrefHeight(200);
 
-        HBox scambioBtns = new HBox(10);
-        scambioBtns.setAlignment(Pos.CENTER_RIGHT);
-        Button scambioAnnulla = ghostButton("Annulla", scambioDialog::close);
-        Button scambioConferma = primaryButton("Invia Offerta di Scambio", () -> {
-            List<Oggetto> selezionati = listOggetti.getSelectionModel().getSelectedItems();
-            if (selezionati.isEmpty()) {
-                warn("Seleziona almeno un oggetto!");
-                return;
+    HBox scambioBtns = new HBox(10);
+    scambioBtns.setAlignment(Pos.CENTER_RIGHT);
+    Button scambioAnnulla = ghostButton("Annulla", scambioDialog::close);
+    Button scambioConferma = primaryButton("Invia Offerta di Scambio", () -> {
+        List<Oggetto> selezionati = listOggetti.getSelectionModel().getSelectedItems();
+        if (selezionati.isEmpty()) {
+            warn("Seleziona almeno un oggetto!");
+            return;
+        }
+        List<String> codiciOggetti = selezionati.stream().map(Oggetto::getCodiceOggetto).collect(Collectors.toList());
+        try {
+            // 1. Crea l'offerta di scambio SENZA il prezzo valorizzato
+            controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "scambio", null);
+            // 2. Recupera il codice dell'offerta appena creata
+            String codiceOfferta = controller.getUltimaOffertaScambioUtente();
+            // 3. Associa ogni oggetto selezionato all'offerta, via tabella 'offre'
+            for (String codiceOggetto : codiciOggetti) {
+                controller.associaOggettoAdOfferta(codiceOfferta, codiceOggetto);
             }
-            List<String> codiciOggetti = selezionati.stream().map(Oggetto::getCodiceOggetto).collect(Collectors.toList());
-            try {
-                controller.inviaOffertaConOggetti(annuncio.getCodiceAnnuncio(), codiciOggetti);
-                scambioDialog.close();
-                warn("Offerta di scambio inviata!");
-            } catch (Exception ex) {
-                warn("Errore invio offerta: " + ex.getMessage());
-            }
-        });
+            scambioDialog.close();
+            warn("Offerta di scambio inviata!");
+        } catch (Exception ex) {
+            warn("Errore invio offerta: " + ex.getMessage());
+        }
+    });
 
-        scambioBtns.getChildren().addAll(scambioAnnulla, scambioConferma);
-        scambioCard.getChildren().addAll(lblSelect, listOggetti, scambioBtns);
+    scambioBtns.getChildren().addAll(scambioAnnulla, scambioConferma);
+    scambioCard.getChildren().addAll(lblSelect, listOggetti, scambioBtns);
 
-        StackPane scambioWrap = new StackPane(scambioCard);
-        scambioWrap.setPadding(new Insets(16));
-        scambioWrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
+    StackPane scambioWrap = new StackPane(scambioCard);
+    scambioWrap.setPadding(new Insets(16));
+    scambioWrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
 
-        scambioDialog.setScene(new Scene(scambioWrap, 550, 400));
-        scambioDialog.showAndWait();
-    }
+    scambioDialog.setScene(new Scene(scambioWrap, 550, 400));
+    scambioDialog.showAndWait();
+}
+
 
     // ============================== Helpers UI ==============================
     private TextArea styledTextArea() {

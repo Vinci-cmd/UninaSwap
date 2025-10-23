@@ -150,4 +150,22 @@ public class OggettoDAO {
             rs.getString("codiceannuncio")
         );
     }
+    
+    public boolean aggiornaOggettoMatricola(String codiceOggetto, String nuovaMatricola) throws SQLException {
+        String sql = "UPDATE oggetto SET matricola = ? WHERE codiceoggetto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, nuovaMatricola);
+            ps.setString(2, codiceOggetto);
+            return ps.executeUpdate() == 1;
+        }
+    }
+    public boolean rimuoviAssociazioneAnnuncio(String codiceOggetto) throws SQLException {
+        String sql = "UPDATE oggetto SET codiceannuncio = NULL WHERE codiceoggetto = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, codiceOggetto);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    
 }

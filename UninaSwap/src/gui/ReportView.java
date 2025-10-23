@@ -1,10 +1,12 @@
 package gui;
 
 import Controller.Controller;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node; 
 import javafx.scene.chart.*;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
@@ -71,7 +73,7 @@ public class ReportView {
 
         // --- Grafico a Torta con Titolo Personalizzato ---
         pieChartTipologie = new PieChart();
-        stylePieChart(pieChartTipologie);
+        stylePieChart(pieChartTipologie); // Metodo modificato
         Label pieTitle = new Label("Distribuzione Annunci per Tipologia");
         pieTitle.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
         VBox pieChartContainer = new VBox(10, pieTitle, pieChartTipologie);
@@ -83,7 +85,7 @@ public class ReportView {
         CategoryAxis xAxisBar = new CategoryAxis();
         NumberAxis yAxisBar = new NumberAxis();
         barChartOfferte = new BarChart<>(xAxisBar, yAxisBar);
-        styleBarChart(barChartOfferte);
+        styleBarChart(barChartOfferte); // Metodo modificato
         Label barTitle = new Label("Confronto Offerte Inviate vs Ricevute");
         barTitle.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
         VBox barChartContainer = new VBox(10, barTitle, barChartOfferte);
@@ -172,25 +174,79 @@ public class ReportView {
         chart.setTitle(null); // Rimuoviamo il titolo interno
         chart.setLabelLineLength(20);
         chart.setLegendVisible(true);
-        chart.setStyle(
-            "-fx-background-color: transparent;" +
-            ".chart-pie-label { -fx-fill: #EAF0FF; -fx-font-size: 11px; }" +
-            ".chart-legend { -fx-background-color: transparent; }" +
-            ".chart-legend .label { -fx-text-fill: white; }"
-        );
+
+        // Applica stile di base solo al grafico
+        chart.setStyle("-fx-background-color: transparent;");
+
+        // Aggiungi listener per applicare stili ai figli quando la scena è pronta
+        chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                applyPieChartStyles(chart);
+            }
+        });
+    }
+
+    /**
+     * Applica stili CSS ai figli del PieChart dopo che è stato renderizzato.
+     */
+    private void applyPieChartStyles(PieChart chart) {
+        Platform.runLater(() -> {
+            // Stile per le etichette SULLE FETTE (usa -fx-fill)
+            chart.lookupAll(".chart-pie-label").forEach(node -> {
+                // Usiamo -fx-fill perché sono nodi Text, non Label
+                node.setStyle("-fx-fill: white; -fx-font-size: 11px;");
+            });
+
+            // Stile per il contenitore della LEGENDA
+            Node legend = chart.lookup(".chart-legend");
+            if (legend != null) {
+                legend.setStyle("-fx-background-color: transparent;");
+            }
+
+            // Stile per le etichette NELLA LEGENDA (usa -fx-text-fill)
+            chart.lookupAll(".chart-legend .label").forEach(label -> {
+                label.setStyle("-fx-text-fill: white;");
+            });
+        });
     }
 
     private void styleBarChart(BarChart<String, Number> chart) {
         chart.setTitle(null); // Rimuoviamo il titolo interno
         chart.setLegendVisible(true);
+
+        // Stili per gli assi (già corretti)
         chart.getXAxis().setStyle("-fx-tick-label-fill: white;");
         chart.getYAxis().setStyle("-fx-tick-label-fill: white;");
-        chart.setStyle(
-            "-fx-background-color: transparent;" +
-            ".chart-legend { -fx-background-color: transparent; }" +
-            ".chart-legend .label { -fx-text-fill: white; }"
-        );
+
+        // Applica stile di base solo al grafico
+        chart.setStyle("-fx-background-color: transparent;");
+
+        // Aggiungi listener per applicare stili ai figli quando la scena è pronta
+        chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                applyBarChartStyles(chart);
+            }
+        });
     }
+
+    /**
+     * Applica stili CSS ai figli del BarChart dopo che è stato renderizzato.
+     */
+    private void applyBarChartStyles(BarChart<String, Number> chart) {
+        Platform.runLater(() -> {
+            // Stile per il contenitore della LEGENDA
+            Node legend = chart.lookup(".chart-legend");
+            if (legend != null) {
+                legend.setStyle("-fx-background-color: transparent;");
+            }
+
+            // Stile per le etichette NELLA LEGENDA
+            chart.lookupAll(".chart-legend .label").forEach(label -> {
+                label.setStyle("-fx-text-fill: white;");
+            });
+        });
+    }
+
 
     private void warn(String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);

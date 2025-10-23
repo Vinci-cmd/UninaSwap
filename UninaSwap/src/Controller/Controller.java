@@ -208,21 +208,33 @@ public class Controller {
     /**
      * Crea nuovo annuncio.
      */
-    public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo) throws SQLException {
+    public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo, String codiceOggetto) throws SQLException {
+        if (codiceOggetto == null || codiceOggetto.isEmpty()) {
+            throw new SQLException("Devi associare obbligatoriamente un tuo oggetto all'annuncio!");
+        }
+
         Date oggi = new Date(System.currentTimeMillis());
         Annuncio nuovoAnnuncio = new Annuncio(
-                null,
-                descrizione,
-                categoria,
-                tipologia,
-                prezzo,
-                "attivo",
-                oggi,
-                utenteCorrente.getMatricola()
+            null,
+            descrizione,
+            categoria,
+            tipologia,
+            prezzo,
+            "attivo",
+            oggi,
+            utenteCorrente.getMatricola()
         );
-        return annuncioDAO.creaAnnuncio(nuovoAnnuncio);
+        boolean result = annuncioDAO.creaAnnuncio(nuovoAnnuncio);
+
+        // Collega oggetto all'annuncio
+        oggettoDAO.aggiornaCodiceAnnuncioOggetto(codiceOggetto, nuovoAnnuncio.getCodiceAnnuncio());
+        // OPPURE, se hai la tabella 'offre':
+        // offreDAO.creaOffre(new Offre(nuovoAnnuncio.getCodiceAnnuncio(), codiceOggetto));
+
+        return result;
     }
 
+    
     /**
      * Modifica annuncio esistente.
      */
@@ -365,26 +377,116 @@ public class Controller {
      * Invia offerta con oggetti (scambio).
      */
     public boolean inviaOffertaConOggetti(String codiceAnnuncio, List<String> codiciOggetti) throws SQLException {
-        Offerta offerta = new Offerta();
-        offerta.setCodiceAnnuncio(codiceAnnuncio);
-        offerta.setTipo("scambio");
-        offerta.setMatricola(utenteCorrente.getMatricola());
-        offerta.setStato("inviata");
-        offerta.setCodiceOfferta(UUID.randomUUID().toString());
-        return inviaOfferta(offerta, codiciOggetti);
+        // Crea l'offerta di scambio
+        boolean ok = inviaOfferta(codiceAnnuncio, "scambio", null);
+        if (ok) {
+            // Ottieni l'ultima offerta creata (o il codice dell'offerta appena creata)
+            String codiceOfferta = getUltimoaOffertaCreata(); // Metodo che recupera l'ultimo codice offerta
+            
+            // Associa tutti gli oggetti selezionati all'offerta
+            for (String codiceOggetto : codiciOggetti) {
+                offreDAO.creaOffre(new Offre(codiceOfferta, codiceOggetto));
+            }
+        }
+        return ok;
+    }
+    
+    private String getUltimoaOffertaCreata() throws SQLException {
+        String matricola = getUtenteCorrente().getMatricola();
+        List<Offerta> offerte = offertaDAO.getOfferteByUtente(matricola);
+        if (offerte.isEmpty()) return null;
+        // Prendi l'ultima offerta creata (assumendo ordinamento per data o ID)
+        return offerte.get(offerte.size() - 1).getCodiceOfferta();
     }
 
+    public String getUltimaOffertaScambioUtente() throws SQLException {
+        List<Offerta> offerte = offertaDAO.getOfferteByUtente(getUtenteCorrente().getMatricola());
+        for (int i = offerte.size() - 1; i >= 0; i--) {
+            if ("scambio".equalsIgnoreCase(offerte.get(i).getTipo())) return offerte.get(i).getCodiceOfferta();
+        }
+        return null;
+    }
+    public void associaOggettoAdOfferta(String codiceOfferta, String codiceOggetto) throws SQLException {
+        offreDAO.creaOffre(new Offre(codiceOfferta, codiceOggetto));
+    }
     /**
      * Accetta offerta.
      */
     public boolean accettaOfferta(String codiceOfferta) {
         try {
-            return offertaDAO.accettaOfferta(codiceOfferta);
+            Offerta offerta = offertaDAO.getOffertaByCodice(codiceOfferta);
+            if (offerta == null) throw new SQLException("Offerta non trovata");
+            boolean ok = offertaDAO.accettaOfferta(codiceOfferta);
+            if (ok) {
+                String nuovoStato = switch (offerta.getTipo().toLowerCase()) {
+                    case "vendita" -> "venduto";
+                    case "scambio" -> "scambiato";
+                    case "regalo" -> "regalato";
+                    default -> "attivo";
+                };
+                Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(offerta.getCodiceAnnuncio());
+                String matricolaAnnunciante = annuncio.getMatricola();
+                String matricolaRichiedente = offerta.getMatricola();
+                
+                // Per TUTTI i tipi: trasferisci l'oggetto dell'annuncio al richiedente
+                List<Oggetto> oggettiAnnuncio = getOggettiByAnnuncio(annuncio.getCodiceAnnuncio());
+                for (Oggetto obj : oggettiAnnuncio) {
+                    oggettoDAO.aggiornaOggettoMatricola(obj.getCodiceOggetto(), matricolaRichiedente);
+                    oggettoDAO.rimuoviAssociazioneAnnuncio(obj.getCodiceOggetto()); // <-- AGGIUNTO
+                }
+                
+                // Solo per SCAMBIO: trasferisci anche gli oggetti dell'offerta all'annunciante
+                if ("scambio".equalsIgnoreCase(offerta.getTipo())) {
+                    List<Offre> oggettiScambiati = offreDAO.getOggettiByOfferta(codiceOfferta);
+                    for (Offre o : oggettiScambiati) {
+                        oggettoDAO.aggiornaOggettoMatricola(o.getCodiceOggetto(), matricolaAnnunciante);
+                        oggettoDAO.rimuoviAssociazioneAnnuncio(o.getCodiceOggetto()); // <-- AGGIUNTO
+                    }
+                }
+                
+                annuncio.setStato(nuovoStato);
+                annuncioDAO.aggiornaAnnuncio(annuncio);
+            }
+            return ok;
         } catch (SQLException e) {
             showError("Errore accettazione offerta: " + e.getMessage());
             return false;
         }
     }
+
+
+
+    public boolean accettaScambio(String codiceOfferta, String matricolaRichiedente) {
+        try {
+            Offerta offerta = offertaDAO.getOffertaByCodice(codiceOfferta);
+            if (offerta == null || !"scambio".equalsIgnoreCase(offerta.getTipo())) {
+                throw new SQLException("Non è uno scambio");
+            }
+            boolean ok = offertaDAO.accettaOfferta(codiceOfferta);
+            if (ok) {
+                List<Offre> oggettiScambiati = offreDAO.getOggettiByOfferta(codiceOfferta);
+                Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(offerta.getCodiceAnnuncio());
+                String matricolaAnnunciante = annuncio.getMatricola();
+                for (Offre o : oggettiScambiati) {
+                    Oggetto obj = oggettoDAO.getOggettoByCodice(o.getCodiceOggetto());
+                    String nuovoProprietario;
+                    if (obj.getMatricola().equals(matricolaAnnunciante)) {
+                        nuovoProprietario = matricolaRichiedente;
+                    } else {
+                        nuovoProprietario = matricolaAnnunciante;
+                    }
+                    oggettoDAO.aggiornaOggettoMatricola(o.getCodiceOggetto(), nuovoProprietario);
+                }
+                annuncio.setStato("scambiato");
+                annuncioDAO.aggiornaAnnuncio(annuncio);
+            }
+            return ok;
+        } catch (SQLException e) {
+            showError("Errore scambio: " + e.getMessage());
+            return false;
+        }
+    }
+
 
     /**
      * Rifiuta offerta.
@@ -420,6 +522,11 @@ public class Controller {
         }
         return codici;
     }
+    
+    public List<Oggetto> getOggettiByUtente(String matricola) throws SQLException {
+        return oggettoDAO.getOggettiByMatricola(matricola);
+    }
+
 
     /**
      * Recupera oggetti di un utente (oggetti completi).
