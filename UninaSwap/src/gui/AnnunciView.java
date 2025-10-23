@@ -267,143 +267,169 @@ public class AnnunciView {
     }
 
     // ============================== DIALOG ==============================
-    private void openDialog(Annuncio existing) {
-        Stage dialog = new Stage();
-        dialog.initModality(Modality.APPLICATION_MODAL);
-        dialog.setTitle(existing == null ? "Nuovo Annuncio" : "Modifica Annuncio");
+private void openDialog(Annuncio existing) {
+    Stage dialog = new Stage();
+    dialog.initModality(Modality.APPLICATION_MODAL);
+    dialog.setTitle(existing == null ? "Nuovo Annuncio" : "Modifica Annuncio");
 
-        VBox card = card();
-        card.setSpacing(12);
+    VBox card = card();
+    card.setSpacing(12);
 
-        GridPane form = new GridPane();
-        form.setHgap(10); form.setVgap(10);
+    GridPane form = new GridPane();
+    form.setHgap(10); form.setVgap(10);
 
-        ComboBox<String> catBox = new ComboBox<>();
-        catBox.setEditable(true);
-        catBox.getItems().setAll(categorie);
-        catBox.setValue(existing == null ? null : existing.getCategoria());
-        styleCombo(catBox);
+    // Categoria
+    ComboBox<String> catBox = new ComboBox<>();
+    catBox.setEditable(true);
+    catBox.getItems().setAll(categorie);
+    catBox.setValue(existing == null ? null : existing.getCategoria());
+    styleCombo(catBox);
 
-        ComboBox<String> tipBox = new ComboBox<>();
-        tipBox.getItems().addAll("vendita", "scambio", "regalo");
-        tipBox.setValue(existing == null ? null : existing.getTipologia());
-        styleCombo(tipBox);
+    // Tipologia
+    ComboBox<String> tipBox = new ComboBox<>();
+    tipBox.getItems().addAll("vendita", "scambio", "regalo");
+    tipBox.setValue(existing == null ? null : existing.getTipologia());
+    styleCombo(tipBox);
 
-        TextField desc = styledTextField("Descrizione");
-        desc.setText(existing != null ? existing.getDescrizione() : "");
+    // Descrizione
+    TextField desc = styledTextField("Descrizione");
+    desc.setText(existing != null ? existing.getDescrizione() : "");
 
-        TextField prezzo = styledTextField("Prezzo");
-        applyNumericFormatter(prezzo);
-        if (existing != null && existing.getPrezzo() != null) {
-            prezzo.setText(String.format(Locale.ITALY, "%.2f", existing.getPrezzo()));
-        }
-        
-        Label prezzoLabel = l("Prezzo");
-        tipBox.valueProperty().addListener((obs, oldV, newV) -> {
-            boolean isVendita = "vendita".equalsIgnoreCase(newV);
-            prezzoLabel.setVisible(isVendita);
-            prezzo.setVisible(isVendita);
-        });
-        prezzoLabel.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
-        prezzo.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
-
-        // ===== AGGIUNTA SELEZIONE OGGETTO (solo oggetti non associati) =====
-        ComboBox<model.Oggetto> oggettiBox = new ComboBox<>();
-        try {
-            List<model.Oggetto> tuttiOggetti = controller.getOggettiByUtente(controller.getUtenteCorrente().getMatricola());
-            // Filtra solo oggetti NON associati ad annunci (codiceAnnuncio è NULL o vuoto)
-            List<model.Oggetto> oggettiDisponibili = tuttiOggetti.stream()
-                .filter(o -> o.getCodiceAnnuncio() == null || o.getCodiceAnnuncio().isEmpty())
-                .toList();
-            
-            oggettiBox.getItems().setAll(oggettiDisponibili);
-            oggettiBox.setPromptText("Seleziona oggetto da associare");
-            oggettiBox.setCellFactory(list -> new ListCell<>() {
-                @Override protected void updateItem(model.Oggetto item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
-                }
-            });
-            oggettiBox.setButtonCell(new ListCell<>() {
-                @Override protected void updateItem(model.Oggetto item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
-                }
-            });
-        } catch (SQLException e) {
-            warn("Errore nel caricamento oggetti: " + e.getMessage());
-        }
-        // ===================================
-
-        ComboBox<String> stateBox = null;
-        if (existing != null) {
-            stateBox = new ComboBox<>();
-            stateBox.getItems().addAll("attivo", "scaduto", "in attesa");
-            stateBox.setValue(existing.getStato());
-            styleCombo(stateBox);
-        }
-
-        int r = 0;
-        form.add(l("Categoria"), 0, r); form.add(catBox, 1, r++);
-        form.add(l("Tipologia"), 0, r); form.add(tipBox, 1, r++);
-        form.add(l("Descrizione"), 0, r); form.add(desc, 1, r++);
-        form.add(prezzoLabel, 0, r); form.add(prezzo, 1, r++);
-        form.add(l("Oggetto"), 0, r); form.add(oggettiBox, 1, r++);
-        if (existing != null) { form.add(l("Stato"), 0, r); form.add(stateBox, 1, r); }
-
-        HBox btns = new HBox(10);
-        btns.setAlignment(Pos.CENTER_RIGHT);
-        Button annulla = ghostButton("Annulla", dialog::close);
-        final ComboBox<String> finalStateBox = stateBox;
-        Button conferma = primaryButton(existing == null ? "Crea" : "Aggiorna", () -> {
-            String categoria = catBox.getEditor().getText() != null ? catBox.getEditor().getText().trim() : "";
-            String tip = tipBox.getValue();
-            String d = desc.getText() != null ? desc.getText().trim() : "";
-
-            if (categoria.isEmpty() || tip == null || d.isEmpty() || (existing != null && (finalStateBox.getValue() == null || finalStateBox.getValue().isEmpty()))) {
-                warn("Compila tutti i campi obbligatori.");
-                return;
-            }
-
-            // ===== CONTROLLO OGGETTO OBBLIGATORIO =====
-            model.Oggetto selezionato = oggettiBox.getValue();
-            if (selezionato == null) {
-                warn("Devi associare un tuo oggetto all'annuncio.");
-                return;
-            }
-            // ==========================================
-
-            double price = 0.0;
-            if ("vendita".equalsIgnoreCase(tip)) {
-                try {
-                    price = Double.parseDouble(prezzo.getText().replace(",", "."));
-                } catch (NumberFormatException | NullPointerException ex) {
-                    warn("Prezzo non valido."); return;
-                }
-            }
-            try {
-                if (existing == null) {
-                    controller.creaAnnuncio(categoria, tip, d, price, selezionato.getCodiceOggetto());
-                } else {
-                    controller.modificaAnnuncio(existing.getCodiceAnnuncio(), categoria, tip, d, price, finalStateBox.getValue());
-                }
-                dialog.close();
-                reloadData();
-            } catch (SQLException ex) {
-                warn("Errore salvataggio: " + ex.getMessage());
-            }
-        });
-        btns.getChildren().addAll(annulla, conferma);
-
-        card.getChildren().addAll(form, btns);
-
-        StackPane wrap = new StackPane(card);
-        wrap.setPadding(new Insets(16));
-        wrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
-
-        dialog.setScene(new Scene(wrap, 520, existing == null ? 380 : 440));
-        dialog.showAndWait();
+    // Prezzo (solo vendita)
+    TextField prezzo = styledTextField("Prezzo");
+    applyNumericFormatter(prezzo);
+    if (existing != null && existing.getPrezzo() != null) {
+        prezzo.setText(String.format(Locale.ITALY, "%.2f", existing.getPrezzo()));
     }
+    Label prezzoLabel = l("Prezzo");
+    tipBox.valueProperty().addListener((obs, oldV, newV) -> {
+        boolean isVendita = "vendita".equalsIgnoreCase(newV);
+        prezzoLabel.setVisible(isVendita);
+        prezzo.setVisible(isVendita);
+    });
+    prezzoLabel.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
+    prezzo.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
+
+    // Oggetto: includi anche l'oggetto già associato all'annuncio
+    ComboBox<model.Oggetto> oggettiBox = new ComboBox<>();
+    try {
+        String me = controller.getUtenteCorrente().getMatricola();
+        List<model.Oggetto> miei = controller.getOggettiByUtente(me);
+
+        String codiceAssociatoCorrenteTmp = null;
+        if (existing != null) {
+            List<model.Oggetto> oggettiAnnuncio = controller.getOggettiByAnnuncio(existing.getCodiceAnnuncio());
+            codiceAssociatoCorrenteTmp = oggettiAnnuncio.isEmpty() ? null : oggettiAnnuncio.get(0).getCodiceOggetto();
+        }
+        final String codiceAssociatoCorrente = codiceAssociatoCorrenteTmp;
+
+        List<model.Oggetto> disponibili = miei.stream()
+            .filter(o -> o.getCodiceAnnuncio() == null || o.getCodiceAnnuncio().isEmpty()
+                   || (codiceAssociatoCorrente != null && o.getCodiceOggetto().equals(codiceAssociatoCorrente)))
+            .toList();
+
+        oggettiBox.getItems().setAll(disponibili);
+        oggettiBox.setPromptText("Seleziona oggetto da associare");
+
+        if (existing != null && codiceAssociatoCorrente != null) {
+            for (model.Oggetto o : disponibili) {
+                if (o.getCodiceOggetto().equals(codiceAssociatoCorrente)) {
+                    oggettiBox.setValue(o);
+                    break;
+                }
+            }
+        }
+        oggettiBox.setCellFactory(list -> new ListCell<>() {
+            @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+            }
+        });
+        oggettiBox.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+            }
+        });
+        styleCombo(oggettiBox);
+    } catch (SQLException e) {
+        warn("Errore nel caricamento oggetti: " + e.getMessage());
+    }
+
+    int r = 0;
+    form.add(l("Categoria"), 0, r); form.add(catBox, 1, r++);
+    form.add(l("Tipologia"), 0, r); form.add(tipBox, 1, r++);
+    form.add(l("Descrizione"), 0, r); form.add(desc, 1, r++);
+    form.add(prezzoLabel, 0, r); form.add(prezzo, 1, r++);
+    form.add(l("Oggetto"), 0, r); form.add(oggettiBox, 1, r++);
+
+    HBox btns = new HBox(10);
+    btns.setAlignment(Pos.CENTER_RIGHT);
+    Button annulla = ghostButton("Annulla", dialog::close);
+
+    Button conferma = primaryButton(existing == null ? "Crea" : "Aggiorna", () -> {
+        String categoria = catBox.getEditor().getText() != null ? catBox.getEditor().getText().trim() : "";
+        String tip = tipBox.getValue();
+        String d = desc.getText() != null ? desc.getText().trim() : "";
+
+        if (categoria.isEmpty() || tip == null || d.isEmpty()) {
+            warn("Compila tutti i campi obbligatori.");
+            return;
+        }
+
+        model.Oggetto selezionato = oggettiBox.getValue();
+        if (selezionato == null) {
+            warn("Devi associare un tuo oggetto all'annuncio.");
+            return;
+        }
+
+        double price = 0.0;
+        if ("vendita".equalsIgnoreCase(tip)) {
+            try {
+                price = Double.parseDouble(prezzo.getText().replace(",", "."));
+            } catch (NumberFormatException | NullPointerException ex) {
+                warn("Prezzo non valido."); return;
+            }
+        }
+
+        try {
+            if (existing == null) {
+                // Creazione + associazione atomica lato Controller (stato = attivo)
+                controller.creaAnnuncio(categoria, tip, d, price, selezionato.getCodiceOggetto());
+            } else {
+                // 1) Aggiorna dati annuncio (Controller normalizza prezzo NULL se non vendita)
+                controller.modificaAnnuncio(existing.getCodiceAnnuncio(), categoria, tip, d, price, existing.getStato());
+
+                // 2) Gestione (ri)associazione oggetto
+                List<model.Oggetto> oggettiAnnuncio = controller.getOggettiByAnnuncio(existing.getCodiceAnnuncio());
+                String codiceOggettoCorrente = oggettiAnnuncio.isEmpty() ? null : oggettiAnnuncio.get(0).getCodiceOggetto();
+
+                if (codiceOggettoCorrente == null || !codiceOggettoCorrente.equals(selezionato.getCodiceOggetto())) {
+                    if (codiceOggettoCorrente != null) {
+                        controller.rimuoviAssociazioneAnnuncioOggetto(codiceOggettoCorrente);
+                    }
+                    // Associa selezionato e riporta annuncio ATTIVO
+                    controller.associaOggettoEAttivaAnnuncio(selezionato.getCodiceOggetto(), existing.getCodiceAnnuncio());
+                }
+            }
+            dialog.close();
+            reloadData();
+        } catch (SQLException ex) {
+            warn("Errore salvataggio: " + ex.getMessage());
+        }
+    });
+
+    btns.getChildren().addAll(annulla, conferma);
+
+    card.getChildren().addAll(form, btns);
+
+    StackPane wrap = new StackPane(card);
+    wrap.setPadding(new Insets(16));
+    wrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
+
+    dialog.setScene(new Scene(wrap, 520, existing == null ? 360 : 420));
+    dialog.showAndWait();
+}
 
 
     private void confirmDelete(Annuncio a) {
@@ -456,7 +482,8 @@ public class AnnunciView {
         return tf;
     }
 
-    private void styleCombo(ComboBox<String> cb) {
+ // prima: private void styleCombo(ComboBox<String> cb)
+    private <T> void styleCombo(ComboBox<T> cb) {
         cb.setStyle(
             "-fx-background-color: rgba(255,255,255,0.10);" +
             "-fx-text-fill: #EAF0FF;" +
@@ -464,7 +491,6 @@ public class AnnunciView {
             "-fx-padding: 2 4;" +
             "-fx-border-color: transparent;"
         );
-
         cb.setOnShowing(e -> Platform.runLater(() -> {
             Node popup = cb.lookup(".combo-box-popup");
             if (popup != null) {
@@ -478,9 +504,9 @@ public class AnnunciView {
                 );
             }
         }));
-
-        styleComboItems(cb);
+        styleComboItems(cb); // già generico
     }
+
 
     // *** METODO MODIFICATO PER LA LEGGIBILITÀ ***
     private <T> void styleComboItems(ComboBox<T> combo) {

@@ -197,6 +197,56 @@ public class Controller {
         return annuncioDAO.getAnnunciFiltrati(categoria, tipologia);
     }
 
+    
+    
+ // Associa un oggetto a un annuncio e riattiva l'annuncio se era scaduto
+    public void associaOggettoEAttivaAnnuncio(String codiceOggetto, String codiceAnnuncio) throws SQLException {
+        boolean auto = conn.getAutoCommit();
+        try {
+            conn.setAutoCommit(false);
+            // 1) Associa l'oggetto
+            oggettoDAO.aggiornaCodiceAnnuncioOggetto(codiceOggetto, codiceAnnuncio);
+            // 2) Riporta annuncio "attivo"
+            annuncioDAO.aggiornaStatoAnnuncio(codiceAnnuncio, "attivo");
+            conn.commit();
+        } catch (SQLException e) {
+            try { conn.rollback(); } catch (SQLException ignore) {}
+            throw e;
+        } finally {
+            try { conn.setAutoCommit(auto); } catch (SQLException ignore) {}
+        }
+    }
+
+    
+    public void disassociaOggettoEChiudiAnnuncio(String codiceOggetto) throws SQLException {
+        boolean auto = conn.getAutoCommit();
+        try {
+            conn.setAutoCommit(false);
+
+            // 1) Leggi l'oggetto per recuperare il codice annuncio
+            Oggetto ogg = oggettoDAO.getOggettoByCodice(codiceOggetto);
+            if (ogg == null) throw new SQLException("Oggetto non trovato: " + codiceOggetto);
+
+            String codiceAnnuncio = ogg.getCodiceAnnuncio();
+
+            // 2) Rimuovi associazione oggetto -> annuncio
+            oggettoDAO.rimuoviAssociazioneAnnuncio(codiceOggetto);
+
+            // 3) Se esiste un annuncio collegato, marcane lo stato a 'scaduto'
+            if (codiceAnnuncio != null && !codiceAnnuncio.isBlank()) {
+                annuncioDAO.aggiornaStatoAnnuncio(codiceAnnuncio, "scaduto");
+            }
+
+            conn.commit();
+        } catch (SQLException e) {
+            try { conn.rollback(); } catch (SQLException ignore) {}
+            throw e;
+        } finally {
+            try { conn.setAutoCommit(auto); } catch (SQLException ignore) {}
+        }
+    }
+    
+    
     /**
      * Recupera descrizione annuncio dato il codice.
      */
@@ -213,52 +263,57 @@ public class Controller {
             throw new SQLException("Devi associare obbligatoriamente un tuo oggetto all'annuncio!");
         }
 
-        Date oggi = new Date(System.currentTimeMillis());
-        Annuncio nuovoAnnuncio = new Annuncio(
-            null,
-            descrizione,
-            categoria,
-            tipologia,
-            prezzo,
-            "attivo",
-            oggi,
-            utenteCorrente.getMatricola()
-        );
-        boolean result = annuncioDAO.creaAnnuncio(nuovoAnnuncio);
+        boolean auto = conn.getAutoCommit();
+        try {
+            conn.setAutoCommit(false);
 
-        // Collega oggetto all'annuncio
-        oggettoDAO.aggiornaCodiceAnnuncioOggetto(codiceOggetto, nuovoAnnuncio.getCodiceAnnuncio());
-        // OPPURE, se hai la tabella 'offre':
-        // offreDAO.creaOffre(new Offre(nuovoAnnuncio.getCodiceAnnuncio(), codiceOggetto));
+            Date oggi = new Date(System.currentTimeMillis());
+            Double prezzoBoxed = "vendita".equalsIgnoreCase(tipologia) ? prezzo : null; // <-- normalizza
 
-        return result;
+            Annuncio nuovoAnnuncio = new Annuncio(
+                null, descrizione, categoria, tipologia, prezzoBoxed, "attivo", oggi, utenteCorrente.getMatricola()
+            );
+            boolean created = annuncioDAO.creaAnnuncio(nuovoAnnuncio);
+            if (!created) throw new SQLException("Creazione annuncio fallita");
+
+            // associa oggetto all'annuncio creato
+            oggettoDAO.aggiornaCodiceAnnuncioOggetto(codiceOggetto, nuovoAnnuncio.getCodiceAnnuncio());
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            try { conn.rollback(); } catch (SQLException ignore) {}
+            throw e;
+        } finally {
+            try { conn.setAutoCommit(auto); } catch (SQLException ignore) {}
+        }
     }
+
 
     
     /**
      * Modifica annuncio esistente.
      */
     public boolean modificaAnnuncio(String codiceAnnuncio,
-                                    String categoria,
-                                    String tipologia,
-                                    String descrizione,
-                                    double prezzo,
-                                    String stato) throws SQLException {
-        Annuncio esistente = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+            String categoria,
+            String tipologia,
+            String descrizione,
+            double prezzo,
+            String stato) throws SQLException {
 
-        Annuncio aggiornato = new Annuncio(
-            codiceAnnuncio,
-            descrizione,
-            categoria,
-            tipologia,
-            prezzo,
-            stato,
-            esistente.getDataPubblicazione(),
-            esistente.getMatricola()
-        );
+Annuncio esistente = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+if (esistente == null) throw new SQLException("Annuncio non trovato");
 
-        return annuncioDAO.aggiornaAnnuncio(aggiornato);
-    }
+Double prezzoBoxed = "vendita".equalsIgnoreCase(tipologia) ? prezzo : null; // <-- normalizza
+
+Annuncio aggiornato = new Annuncio(
+codiceAnnuncio, descrizione, categoria, tipologia, prezzoBoxed,
+stato, esistente.getDataPubblicazione(), esistente.getMatricola()
+);
+
+return annuncioDAO.aggiornaAnnuncio(aggiornato);
+}
+
 
     /**
      * Elimina annuncio.
@@ -489,6 +544,11 @@ public class Controller {
              try { conn.setAutoCommit(autoCommitOriginale); } catch (SQLException ex) { showError("Errore ripristino autocommit: " + ex.getMessage()); }
         }
     }
+    
+    public boolean aggiornaStatoAnnuncio(String codiceAnnuncio, String nuovoStato) throws SQLException {
+        return annuncioDAO.aggiornaStatoAnnuncio(codiceAnnuncio, nuovoStato);
+    }
+
 
 
     // Questo metodo specifico per lo scambio potrebbe non essere più necessario
