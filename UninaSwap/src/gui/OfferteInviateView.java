@@ -85,9 +85,9 @@ public class OfferteInviateView {
         cbStato.setOnAction(e -> applyFilters());
 
         tfSearch = styledTextField("Cerca per codice annuncio...");
+        searchDebounce.setOnFinished(ev -> applyFilters());
         tfSearch.textProperty().addListener((obs, o, n) -> {
             searchDebounce.stop();
-            searchDebounce.setOnFinished(ev -> applyFilters());
             searchDebounce.playFromStart();
         });
 
@@ -148,11 +148,15 @@ public class OfferteInviateView {
             @Override
             public void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || getIndex() < 0 || getIndex() >= getTableView().getItems().size()
-                        || !"inviata".equals(getTableView().getItems().get(getIndex()).getStato())) {
+                if (empty) {
                     setGraphic(null);
                 } else {
-                    setGraphic(btnAnnulla);
+                    Offerta offerta = getTableView().getItems().get(getIndex());
+                    if (offerta != null && "inviata".equals(offerta.getStato())) {
+                        setGraphic(btnAnnulla);
+                    } else {
+                        setGraphic(null);
+                    }
                 }
             }
         });
@@ -338,7 +342,7 @@ public class OfferteInviateView {
         ta.setStyle("-fx-background-color: rgba(255,255,255,0.10); -fx-control-inner-background: rgba(16,20,30,0.35); -fx-text-fill: #EAF0FF; -fx-background-radius: 12; -fx-border-radius: 12; -fx-padding: 10 12; -fx-prompt-text-fill: rgba(234,240,255,0.45); -fx-border-color: transparent;");
     }
     
-    private void styleCombo(ComboBox<String> cb) {
+    private <T> void styleCombo(ComboBox<T> cb) {
         cb.setStyle("-fx-background-color: rgba(255,255,255,0.10); -fx-text-fill: #EAF0FF; -fx-background-radius: 12; -fx-padding: 2 4; -fx-border-color: transparent;");
         cb.setOnShowing(e -> Platform.runLater(() -> {
             Node popup = cb.lookup(".combo-box-popup");
@@ -389,9 +393,11 @@ public class OfferteInviateView {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
         final String baseStyle = "-fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700; -fx-text-fill: white;";
-        b.setStyle("-fx-background-color: #4f8cff;" + baseStyle);
-        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: #3b6fe0;" + baseStyle));
-        b.setOnMouseExited(e -> b.setStyle("-fx-background-color: #4f8cff;" + baseStyle));
+        final String normalStyle = "-fx-background-color: #4f8cff;" + baseStyle;
+        final String hoverStyle = "-fx-background-color: #3b6fe0;" + baseStyle;
+        b.setStyle(normalStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+        b.setOnMouseExited(e -> b.setStyle(normalStyle));
         return b;
     }
 
@@ -399,9 +405,11 @@ public class OfferteInviateView {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
         final String baseStyle = "-fx-text-fill: #EAF0FF; -fx-border-color: rgba(255,255,255,0.20); -fx-border-radius: 12; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;";
-        b.setStyle("-fx-background-color: transparent;" + baseStyle);
-        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: rgba(255,255,255,0.08);" + baseStyle));
-        b.setOnMouseExited(e -> b.setStyle("-fx-background-color: transparent;" + baseStyle));
+        final String normalStyle = "-fx-background-color: transparent;" + baseStyle;
+        final String hoverStyle = "-fx-background-color: rgba(255,255,255,0.08);" + baseStyle;
+        b.setStyle(normalStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+        b.setOnMouseExited(e -> b.setStyle(normalStyle));
         return b;
     }
     

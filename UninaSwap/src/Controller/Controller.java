@@ -26,7 +26,6 @@ public class Controller {
     private OffertaDAO offertaDAO;
     private OffreDAO offreDAO;
     private OggettoDAO oggettoDAO;
-    private TipoConsegnaDAO tipoConsegnaDAO;
     private UtenteDAO utenteDAO;
 
     private Utente utenteCorrente;
@@ -41,7 +40,6 @@ public class Controller {
         this.offertaDAO = new OffertaDAO(conn);
         this.offreDAO = new OffreDAO(conn);
         this.oggettoDAO = new OggettoDAO(conn);
-        this.tipoConsegnaDAO = new TipoConsegnaDAO(conn);
         this.utenteDAO = new UtenteDAO(conn);
     }
 
@@ -562,75 +560,37 @@ public class Controller {
      * @return true se l'acquisto è andato a buon fine.
      * @throws SQLException Se c'è un errore DB o logico.
      */
-    public boolean compraSubito(String codiceAnnuncio) throws SQLException {
-        
-        String matricolaBuyer = getUtenteCorrente().getMatricola();
-        Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
-
-        // --- VALIDAZIONE LOGICA ---
-        if (annuncio == null) throw new SQLException("Annuncio non trovato.");
-        if (!"attivo".equals(annuncio.getStato())) throw new SQLException("Questo annuncio non è più attivo.");
-        if (annuncio.getMatricola().equals(matricolaBuyer)) throw new SQLException("Non puoi acquistare un tuo annuncio.");
-        if (!"vendita".equals(annuncio.getTipologia()) || annuncio.getPrezzo() == null) throw new SQLException("Questo annuncio non è in vendita o non ha un prezzo.");
-
-        double prezzoPieno = annuncio.getPrezzo();
-        boolean autoCommitOriginale = conn.getAutoCommit();
-
-        try {
-            // --- INIZIO TRANSAZIONE ---
-            conn.setAutoCommit(false);
-
-            // 1. Aggiorna l'annuncio a "venduto"
-            boolean statoAggiornato = annuncioDAO.aggiornaStatoAnnuncio(annuncio.getCodiceAnnuncio(), "venduto");
-            if (!statoAggiornato) {
-                throw new SQLException("Impossibile aggiornare lo stato dell'annuncio a 'venduto'.");
-            }
-
-            // 2. Crea l'offerta GIA' ACCETTATA per tracciare la vendita
-            Offerta offerta = new Offerta();
-            offerta.setCodiceOfferta(UUID.randomUUID().toString());
-            offerta.setCodiceAnnuncio(codiceAnnuncio);
-            offerta.setMatricola(matricolaBuyer);
-            offerta.setTipo("vendita");
-            offerta.setPrezzoOfferto(prezzoPieno);
-            offerta.setStato("accettata"); // <-- GIA' ACCETTATA
-            offerta.setData(new Date(System.currentTimeMillis()));
-            offerta.setMessaggio("Acquisto 'Compra Subito'");
-            
-            boolean offertaCreata = offertaDAO.creaOfferta(offerta); 
-            if(!offertaCreata) {
-                 throw new SQLException("Impossibile creare l'offerta per l'acquisto.");
-            }
-            
-            // 3. Rifiuta tutte le ALTRE offerte "inviate" per questo annuncio
-            List<Offerta> altreOfferte = offertaDAO.getOfferteByCodiceAnnuncio(codiceAnnuncio);
-            for (Offerta o : altreOfferte) {
-                if ("inviata".equals(o.getStato())) {
-                    boolean rifiutata = offertaDAO.rifiutaOfferta(o.getCodiceOfferta());
-                    if (!rifiutata) {
-                         System.err.println("Attenzione: Impossibile rifiutare l'offerta " + o.getCodiceOfferta());
-                    }
-                }
-            }
-
-            // 4. Trasferisci oggetto/i DELL'ANNUNCIO all'ACQUIRENTE (buyer)
-            List<Oggetto> oggettiAnnuncio = getOggettiByAnnuncio(annuncio.getCodiceAnnuncio());
-            for (Oggetto obj : oggettiAnnuncio) {
-                oggettoDAO.aggiornaOggettoMatricola(obj.getCodiceOggetto(), matricolaBuyer);
-                oggettoDAO.rimuoviAssociazioneAnnuncio(obj.getCodiceOggetto()); 
-            }
-
-            // --- FINE TRANSAZIONE ---
-            conn.commit();
-            return true;
-
-        } catch (Exception e) {
-            conn.rollback();
-            throw new SQLException("Errore durante la transazione di acquisto: " + e.getMessage());
-        } finally {
-            conn.setAutoCommit(autoCommitOriginale);
-        }
+public boolean compraSubito(String codiceAnnuncio) throws SQLException {
+    // Recupera l'annuncio
+    Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+    if (annuncio == null) {
+        throw new SQLException("Annuncio non trovato");
     }
+    
+    // Verifica che sia attivo e di tipo vendita
+    if (!"attivo".equalsIgnoreCase(annuncio.getStato())) {
+        throw new SQLException("L'annuncio non è più attivo");
+    }
+    if (!"vendita".equalsIgnoreCase(annuncio.getTipologia())) {
+        throw new SQLException("Il compra subito è disponibile solo per annunci di vendita");
+    }
+    
+    // 1. Cambia lo stato dell'annuncio a "venduto"
+    annuncio.setStato("venduto");
+    annuncioDAO.aggiornaAnnuncio(annuncio);
+    
+    // 2. Trasferisci la proprietà degli oggetti associati all'annuncio
+    List<Oggetto> oggettiAnnuncio = oggettoDAO.getOggettiByAnnuncio(codiceAnnuncio);
+    String compratore = getUtenteCorrente().getMatricola();
+    
+    for (Oggetto obj : oggettiAnnuncio) {
+        oggettoDAO.aggiornaOggettoMatricola(obj.getCodiceOggetto(), compratore);
+        oggettoDAO.rimuoviAssociazioneAnnuncio(obj.getCodiceOggetto());
+    }
+    
+    return true;
+}
+
 
 
     // =========================================================
@@ -711,37 +671,6 @@ public class Controller {
      }
 
 
-    // =========================================================
-    // == TIPI CONSEGNA
-    // =========================================================
-
-    /**
-     * Crea tipo consegna.
-     */
-    public boolean creaTipoConsegna(TipoConsegna consegna) throws SQLException {
-        return tipoConsegnaDAO.creaTipoConsegna(consegna);
-    }
-
-    /**
-     * Aggiorna tipo consegna.
-     */
-    public boolean aggiornaTipoConsegna(TipoConsegna consegna) throws SQLException {
-        return tipoConsegnaDAO.aggiornaTipoConsegna(consegna);
-    }
-
-    /**
-     * Elimina tipo consegna.
-     */
-    public boolean eliminaTipoConsegna(String codiceConsegna) throws SQLException {
-        return tipoConsegnaDAO.eliminaTipoConsegna(codiceConsegna);
-    }
-
-    /**
-     * Consegne associate a un annuncio.
-     */
-    public List<TipoConsegna> getConsegneByAnnuncio(String codiceAnnuncio) throws SQLException {
-        return tipoConsegnaDAO.getConsegneByAnnuncio(codiceAnnuncio);
-    }
 
     // =========================================================
     // == STATISTICHE

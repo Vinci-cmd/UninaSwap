@@ -25,7 +25,6 @@ import model.*;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public class AnnunciView {
@@ -33,19 +32,16 @@ public class AnnunciView {
     private VBox root;
     private final Controller controller;
 
-    // Dati
     private final ObservableList<Annuncio> masterData = FXCollections.observableArrayList();
     private FilteredList<Annuncio> filtered;
     private SortedList<Annuncio> sorted;
 
-    // UI
     private TableView<Annuncio> table;
     private ComboBox<String> cbCategoria;
     private ComboBox<String> cbTipologia;
     private TextField tfSearch;
     private Label emptyLabel;
 
-    // Filtri
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(200));
     private List<String> categorie;
 
@@ -55,7 +51,6 @@ public class AnnunciView {
         reloadData();
     }
 
-    // ============================== UI ==============================
     private void createUI() {
         root = new VBox(16);
         root.setPadding(new Insets(16));
@@ -87,9 +82,9 @@ public class AnnunciView {
         cbCategoria.setOnAction(e -> applyFilters());
 
         tfSearch = styledTextField("Cerca per testo o codice…");
+        searchDebounce.setOnFinished(ev -> applyFilters());
         tfSearch.textProperty().addListener((obs, o, n) -> {
             searchDebounce.stop();
-            searchDebounce.setOnFinished(ev -> applyFilters());
             searchDebounce.playFromStart();
         });
 
@@ -212,7 +207,6 @@ public class AnnunciView {
         root.getChildren().addAll(header, filtersCard, tableCard);
     }
 
-    // ============================== DATA ==============================
     private void reloadData() {
         try {
             masterData.setAll(controller.getAnnunciByUtente(controller.getUtenteCorrente().getMatricola()));
@@ -255,8 +249,8 @@ public class AnnunciView {
 
             if (!query.isEmpty()) {
                 return (a.getCodiceAnnuncio() != null && a.getCodiceAnnuncio().toLowerCase().contains(query)) ||
-                       (a.getCategoria() != null && a.getCategoria().toLowerCase().contains(query)) ||
-                       (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(query));
+                    (a.getCategoria() != null && a.getCategoria().toLowerCase().contains(query)) ||
+                    (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(query));
             }
             return true;
         });
@@ -266,7 +260,6 @@ public class AnnunciView {
         emptyLabel.setManaged(empty);
     }
 
-    // ============================== DIALOG ==============================
     private void openDialog(Annuncio existing) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -307,33 +300,32 @@ public class AnnunciView {
         prezzoLabel.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
         prezzo.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
 
-        // ===== AGGIUNTA SELEZIONE OGGETTO (solo oggetti non associati) =====
         ComboBox<model.Oggetto> oggettiBox = new ComboBox<>();
-        try {
-            List<model.Oggetto> tuttiOggetti = controller.getOggettiByUtente(controller.getUtenteCorrente().getMatricola());
-            // Filtra solo oggetti NON associati ad annunci (codiceAnnuncio è NULL o vuoto)
-            List<model.Oggetto> oggettiDisponibili = tuttiOggetti.stream()
-                .filter(o -> o.getCodiceAnnuncio() == null || o.getCodiceAnnuncio().isEmpty())
-                .toList();
-            
-            oggettiBox.getItems().setAll(oggettiDisponibili);
-            oggettiBox.setPromptText("Seleziona oggetto da associare");
-            oggettiBox.setCellFactory(list -> new ListCell<>() {
-                @Override protected void updateItem(model.Oggetto item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
-                }
-            });
-            oggettiBox.setButtonCell(new ListCell<>() {
-                @Override protected void updateItem(model.Oggetto item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
-                }
-            });
-        } catch (SQLException e) {
-            warn("Errore nel caricamento oggetti: " + e.getMessage());
+        if (existing == null) {
+            try {
+                List<model.Oggetto> tuttiOggetti = controller.getOggettiByUtente(controller.getUtenteCorrente().getMatricola());
+                List<model.Oggetto> oggettiDisponibili = tuttiOggetti.stream()
+                    .filter(o -> o.getCodiceAnnuncio() == null || o.getCodiceAnnuncio().isEmpty())
+                    .toList();
+                
+                oggettiBox.getItems().setAll(oggettiDisponibili);
+                oggettiBox.setPromptText("Seleziona oggetto da associare");
+                oggettiBox.setCellFactory(list -> new ListCell<>() {
+                    @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+                    }
+                });
+                oggettiBox.setButtonCell(new ListCell<>() {
+                    @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+                    }
+                });
+            } catch (SQLException e) {
+                warn("Errore nel caricamento oggetti: " + e.getMessage());
+            }
         }
-        // ===================================
 
         ComboBox<String> stateBox = null;
         if (existing != null) {
@@ -348,8 +340,12 @@ public class AnnunciView {
         form.add(l("Tipologia"), 0, r); form.add(tipBox, 1, r++);
         form.add(l("Descrizione"), 0, r); form.add(desc, 1, r++);
         form.add(prezzoLabel, 0, r); form.add(prezzo, 1, r++);
-        form.add(l("Oggetto"), 0, r); form.add(oggettiBox, 1, r++);
-        if (existing != null) { form.add(l("Stato"), 0, r); form.add(stateBox, 1, r); }
+        
+        if (existing == null) {
+            form.add(l("Oggetto"), 0, r); form.add(oggettiBox, 1, r++);
+        } else {
+            form.add(l("Stato"), 0, r); form.add(stateBox, 1, r);
+        }
 
         HBox btns = new HBox(10);
         btns.setAlignment(Pos.CENTER_RIGHT);
@@ -365,14 +361,6 @@ public class AnnunciView {
                 return;
             }
 
-            // ===== CONTROLLO OGGETTO OBBLIGATORIO =====
-            model.Oggetto selezionato = oggettiBox.getValue();
-            if (selezionato == null) {
-                warn("Devi associare un tuo oggetto all'annuncio.");
-                return;
-            }
-            // ==========================================
-
             double price = 0.0;
             if ("vendita".equalsIgnoreCase(tip)) {
                 try {
@@ -383,6 +371,11 @@ public class AnnunciView {
             }
             try {
                 if (existing == null) {
+                    model.Oggetto selezionato = oggettiBox.getValue();
+                    if (selezionato == null) {
+                        warn("Devi associare un tuo oggetto all'annuncio.");
+                        return;
+                    }
                     controller.creaAnnuncio(categoria, tip, d, price, selezionato.getCodiceOggetto());
                 } else {
                     controller.modificaAnnuncio(existing.getCodiceAnnuncio(), categoria, tip, d, price, finalStateBox.getValue());
@@ -421,7 +414,6 @@ public class AnnunciView {
         });
     }
 
-    // ============================== Helpers UI ==============================
     private VBox card() {
         VBox card = new VBox();
         card.setPadding(new Insets(16));
@@ -456,7 +448,7 @@ public class AnnunciView {
         return tf;
     }
 
-    private void styleCombo(ComboBox<String> cb) {
+    private <T> void styleCombo(ComboBox<T> cb) {
         cb.setStyle(
             "-fx-background-color: rgba(255,255,255,0.10);" +
             "-fx-text-fill: #EAF0FF;" +
@@ -482,7 +474,6 @@ public class AnnunciView {
         styleComboItems(cb);
     }
 
-    // *** METODO MODIFICATO PER LA LEGGIBILITÀ ***
     private <T> void styleComboItems(ComboBox<T> combo) {
         combo.setButtonCell(new ListCell<>() {
             @Override
@@ -500,10 +491,9 @@ public class AnnunciView {
                     super.updateItem(item, empty);
                     setText(empty || item == null ? null : String.valueOf(item));
                     if (!empty) {
-                        // Stile base di ogni cella nel popup
                         setStyle(
                             "-fx-text-fill: #EAF0FF;" +
-                            "-fx-background-color: #181b23;" + // **MODIFICA**: Sfondo scuro per ogni cella
+                            "-fx-background-color: #181b23;" +
                             "-fx-padding: 8 12;" +
                             "-fx-font-size: 14px;"
                         );
@@ -514,7 +504,6 @@ public class AnnunciView {
             };
             cell.setOnMouseEntered(e -> {
                 if (!cell.isEmpty()) {
-                    // Stile al passaggio del mouse (hover)
                     cell.setStyle(
                         "-fx-text-fill: white;" +
                         "-fx-background-color: #4f8cff;" +
@@ -526,10 +515,9 @@ public class AnnunciView {
             });
             cell.setOnMouseExited(e -> {
                 if (!cell.isEmpty()) {
-                    // Ripristina lo stile base quando il mouse esce
                     cell.setStyle(
                         "-fx-text-fill: #EAF0FF;" +
-                        "-fx-background-color: #181b23;" + // **MODIFICA**: Ripristina lo sfondo scuro
+                        "-fx-background-color: #181b23;" +
                         "-fx-padding: 8 12;" +
                         "-fx-font-size: 14px;"
                     );
