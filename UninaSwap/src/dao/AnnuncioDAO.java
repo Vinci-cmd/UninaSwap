@@ -8,11 +8,8 @@ import model.Annuncio;
 public class AnnuncioDAO {
     private final Connection conn;
 
-    public AnnuncioDAO(Connection conn) {
-        this.conn = conn;
-    }
+    public AnnuncioDAO(Connection conn) { this.conn = conn; }
 
-    // Metodo per evitare duplicazione codice (senza dover scrivere sempre rs.getstring e.c.c)
     private Annuncio extractAnnuncio(ResultSet rs) throws SQLException {
         return new Annuncio(
             rs.getString("codiceannuncio"),
@@ -26,75 +23,57 @@ public class AnnuncioDAO {
         );
     }
 
-    //Ricavare annuncio dal proprio codice
     public Annuncio getAnnuncioByCodice(String codice) throws SQLException {
         String sql = "SELECT * FROM annuncio WHERE codiceannuncio = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, codice);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return extractAnnuncio(rs);
-            }
+            try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return extractAnnuncio(rs); }
         }
         return null;
     }
 
-    //Metodo per trovare gli annunci Attivi
     public List<Annuncio> getAnnunciAttivi() throws SQLException {
         String sql = "SELECT * FROM annuncio WHERE stato = 'attivo'";
         List<Annuncio> lista = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) lista.add(extractAnnuncio(rs));
         }
         return lista;
     }
 
-    //Metodo per gli annunci filtrati
-    
     public List<Annuncio> getAnnunciFiltrati(String categoria, String tipologia) throws SQLException {
         StringBuilder sql = new StringBuilder("SELECT * FROM annuncio WHERE stato = 'attivo'");
         if (categoria != null && !categoria.isEmpty()) sql.append(" AND categoria = ?");
         if (tipologia != null && !tipologia.isEmpty()) sql.append(" AND tipologia = ?");
         List<Annuncio> lista = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            int index = 1;
-            if (categoria != null && !categoria.isEmpty()) ps.setString(index++, categoria);
-            if (tipologia != null && !tipologia.isEmpty()) ps.setString(index++, tipologia);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) lista.add(extractAnnuncio(rs));
-            }
+            int i = 1;
+            if (categoria != null && !categoria.isEmpty()) ps.setString(i++, categoria);
+            if (tipologia != null && !tipologia.isEmpty()) ps.setString(i++, tipologia);
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) lista.add(extractAnnuncio(rs)); }
         }
         return lista;
     }
 
-    //Metodo per la craezione di un annuncio
     public boolean creaAnnuncio(Annuncio annuncio) throws SQLException {
-        String last = getLastCodiceAnnuncio();
-        String prefix = "AN";
+        String last = getLastCodiceAnnuncio(), prefix = "AN";
         int nextNum = 1;
         if (last != null && last.startsWith(prefix)) {
             String numPart = last.substring(prefix.length());
-            try {
-                nextNum = Integer.parseInt(numPart) + 1;
-            } catch(NumberFormatException e) {
-                System.err.println("Errore parsing codice annuncio: " + numPart);
-                throw e;
-            }
+            try { nextNum = Integer.parseInt(numPart) + 1; }
+            catch (NumberFormatException e) { System.err.println("Errore parsing codice annuncio: " + numPart); throw e; }
         }
-        String newCode = String.format(prefix + "%05d", nextNum);
-        annuncio.setCodiceAnnuncio(newCode);
+        annuncio.setCodiceAnnuncio(String.format(prefix + "%05d", nextNum));
 
-        String sql = "INSERT INTO annuncio (codiceannuncio, descrizione, categoria, tipologia, prezzo, stato, datapubblicazione, matricola) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO annuncio (codiceannuncio, descrizione, categoria, tipologia, prezzo, stato, datapubblicazione, matricola) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, annuncio.getCodiceAnnuncio());
             ps.setString(2, annuncio.getDescrizione());
             ps.setString(3, annuncio.getCategoria());
             ps.setString(4, annuncio.getTipologia());
-            if ("vendita".equalsIgnoreCase(annuncio.getTipologia())) ps.setDouble(5, annuncio.getPrezzo());
-            else ps.setNull(5, java.sql.Types.DOUBLE);
+            if ("vendita".equalsIgnoreCase(annuncio.getTipologia())) ps.setDouble(5, annuncio.getPrezzo()); else ps.setNull(5, Types.DOUBLE);
             ps.setString(6, annuncio.getStato());
-            ps.setDate(7, new java.sql.Date(annuncio.getDataPubblicazione().getTime()));
+            ps.setDate(7, new Date(annuncio.getDataPubblicazione().getTime()));
             ps.setString(8, annuncio.getMatricola());
             int rows = ps.executeUpdate();
             if (!conn.getAutoCommit()) conn.commit();
@@ -102,15 +81,13 @@ public class AnnuncioDAO {
         }
     }
 
-    //Metodo per l'update di un annuncioo (Aggiorna sia Data che prezzo)
     public boolean aggiornaAnnuncio(Annuncio annuncio) throws SQLException {
         String sql = "UPDATE annuncio SET descrizione = ?, categoria = ?, tipologia = ?, prezzo = ?, stato = ?, datapubblicazione = ? WHERE codiceannuncio = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, annuncio.getDescrizione());
             ps.setString(2, annuncio.getCategoria());
             ps.setString(3, annuncio.getTipologia());
-            if (annuncio.getPrezzo() != null) ps.setDouble(4, annuncio.getPrezzo());
-            else ps.setNull(4, Types.NUMERIC);
+            if (annuncio.getPrezzo() != null) ps.setDouble(4, annuncio.getPrezzo()); else ps.setNull(4, Types.NUMERIC);
             ps.setString(5, annuncio.getStato());
             ps.setDate(6, annuncio.getDataPubblicazione());
             ps.setString(7, annuncio.getCodiceAnnuncio());
@@ -118,82 +95,46 @@ public class AnnuncioDAO {
         }
     }
 
-    //Metodo per la modifica di un annuncio (non aggiorna la data e il prezzo solamente s etipo vendita)
     public boolean modificaAnnuncio(Annuncio annuncio) throws SQLException {
         String sql = "UPDATE annuncio SET descrizione = ?, categoria = ?, tipologia = ?, prezzo = ?, stato = ? WHERE codiceannuncio = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, annuncio.getDescrizione());
             ps.setString(2, annuncio.getCategoria());
             ps.setString(3, annuncio.getTipologia());
-            if ("vendita".equalsIgnoreCase(annuncio.getTipologia())) ps.setDouble(4, annuncio.getPrezzo());
-            else ps.setNull(4, java.sql.Types.DOUBLE);
+            if ("vendita".equalsIgnoreCase(annuncio.getTipologia())) ps.setDouble(4, annuncio.getPrezzo()); else ps.setNull(4, Types.DOUBLE);
             ps.setString(5, annuncio.getStato());
             ps.setString(6, annuncio.getCodiceAnnuncio());
             return ps.executeUpdate() == 1;
         }
     }
 
-    // =========================================================
-    // == METODO AGGIUNTO PER CORREGGERE IL "COMPRA SUBITO" ===
-    // =========================================================
-    /**
-     * Aggiorna SOLO lo stato di un annuncio.
-     * Usato per marcare un annuncio come "concluso" o "scaduto" senza violare i vincoli.
-     */
     public boolean aggiornaStatoAnnuncio(String codiceAnnuncio, String nuovoStato) throws SQLException {
-        // Usa i nomi colonna corretti (codiceannuncio, stato)
         String sql = "UPDATE annuncio SET stato = ? WHERE codiceannuncio = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nuovoStato);
-            ps.setString(2, codiceAnnuncio);
-            int righeModificate = ps.executeUpdate();
-            return righeModificate > 0;
-        }
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { ps.setString(1, nuovoStato); ps.setString(2, codiceAnnuncio); return ps.executeUpdate() > 0; }
     }
-    // =========================================================
-    // =========================================================
 
-
-    //Metodo per eliminare annuncio
     public boolean eliminaAnnuncio(String codice) throws SQLException {
         String sql = "DELETE FROM annuncio WHERE codiceannuncio = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, codice);
-            return ps.executeUpdate() == 1;
-        }
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { ps.setString(1, codice); return ps.executeUpdate() == 1; }
     }
 
-    //Ricava annunci collegati ad un utente
     public List<Annuncio> getAnnunciByUtente(String matricola) throws SQLException {
         String sql = "SELECT * FROM annuncio WHERE matricola = ?";
         List<Annuncio> lista = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, matricola);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) lista.add(extractAnnuncio(rs));
-            }
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) lista.add(extractAnnuncio(rs)); }
         }
         return lista;
     }
 
-    
-    //Numero totale degli annunci
     public int getTotaleAnnunci() throws SQLException {
         String sql = "SELECT COUNT(*) FROM annuncio";
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) return rs.getInt(1);
-        }
-        return 0;
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt(1) : 0; }
     }
 
-    //Recupera l'ultimo codice Annuncio
     public String getLastCodiceAnnuncio() throws SQLException {
         String sql = "SELECT MAX(codiceannuncio) AS maxcode FROM annuncio WHERE codiceannuncio LIKE 'AN%'";
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) return rs.getString("maxcode");
-        }
-        return null;
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getString("maxcode") : null; }
     }
 }

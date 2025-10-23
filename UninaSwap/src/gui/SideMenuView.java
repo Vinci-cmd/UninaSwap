@@ -17,58 +17,43 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class SideMenuView {
+
     private VBox menuBox;
     private ToggleButton toggleButton;
     private boolean isVisible = true;
     private Consumer<String> onMenuSelection;
 
-    // Sezione Annunci
     private Button btnAnnunciHeader;
     private VBox annunciSubmenu;
     private boolean annunciExpanded = false;
 
-    // Sezione Offerte
     private Button btnOfferteHeader;
     private VBox offerteSubmenu;
     private boolean offerteExpanded = false;
 
-    // Pulsanti principali
-    private Button btnHome;
-    private Button btnOggetti;
-    private Button btnStatistiche;
+    private Button btnHome, btnOggetti, btnStatistiche;
 
-    // tracking per stato selezionato
     private final List<Button> allClickableButtons = new ArrayList<>();
     private Button selectedBtn = null;
 
-    public SideMenuView() {
-        createUI();
-    }
+    public SideMenuView() { createUI(); }
 
     private void createUI() {
         menuBox = new VBox(8);
         menuBox.setPadding(new Insets(12));
         menuBox.setPrefWidth(220);
         menuBox.setAlignment(Pos.TOP_LEFT);
-        menuBox.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.06);" +
-            "-fx-background-radius: 18;" +
-            "-fx-border-radius: 18;" +
-            "-fx-border-color: rgba(255,255,255,0.10);" +
-            "-fx-border-width: 1;"
-        );
+        menuBox.setStyle("-fx-background-color: rgba(255,255,255,0.06);-fx-background-radius: 18;-fx-border-radius: 18;-fx-border-color: rgba(255,255,255,0.10);-fx-border-width: 1;");
         menuBox.setEffect(new DropShadow(24, Color.color(0,0,0,0.45)));
 
         toggleButton = new ToggleButton("☰");
         styleToggle(toggleButton);
         toggleButton.setOnAction(e -> toggleMenu());
 
-        // HOME
         btnHome = mainItem("⌂  Home", "home");
         rememberTexts(btnHome, "⌂  Home");
         btnHome.setOnAction(e -> { select(btnHome); notifyMenuSelection("home"); });
 
-        // ANNUNCI
         btnAnnunciHeader = mainItem("📄  Annunci ▶", null);
         rememberTexts(btnAnnunciHeader, "📄  Annunci ▶");
         btnAnnunciHeader.setOnAction(e -> toggleAnnunciSubmenu());
@@ -83,10 +68,8 @@ public class SideMenuView {
 
         annunciSubmenu = new VBox(6, btnGestisciAnnunci, btnListaAnnunci);
         annunciSubmenu.setPadding(new Insets(0, 0, 0, 16));
-        annunciSubmenu.setVisible(false);
-        annunciSubmenu.setManaged(false);
+        annunciSubmenu.setVisible(false); annunciSubmenu.setManaged(false);
 
-        // OFFERTE
         btnOfferteHeader = mainItem("💬  Offerte ▶", null);
         rememberTexts(btnOfferteHeader, "💬  Offerte ▶");
         btnOfferteHeader.setOnAction(e -> toggleOfferteSubmenu());
@@ -101,10 +84,8 @@ public class SideMenuView {
 
         offerteSubmenu = new VBox(6, btnOfferteInviate, btnOfferteRicevute);
         offerteSubmenu.setPadding(new Insets(0, 0, 0, 16));
-        offerteSubmenu.setVisible(false);
-        offerteSubmenu.setManaged(false);
+        offerteSubmenu.setVisible(false); offerteSubmenu.setManaged(false);
 
-        // OGGETTI / STATISTICHE
         btnOggetti = mainItem("📦  Oggetti personali", "oggetti");
         rememberTexts(btnOggetti, "📦  Oggetti personali");
         btnOggetti.setOnAction(e -> { select(btnOggetti); notifyMenuSelection("oggetti"); });
@@ -114,296 +95,145 @@ public class SideMenuView {
         btnStatistiche.setOnAction(e -> { select(btnStatistiche); notifyMenuSelection("statistiche"); });
 
         menuBox.getChildren().addAll(
-            toggleButton,
-            spacer(4),
-            btnHome,
-            spacer(2),
+            toggleButton, spacer(4),
+            btnHome, spacer(2),
             btnAnnunciHeader, annunciSubmenu,
             btnOfferteHeader, offerteSubmenu,
-            spacer(2),
-            btnOggetti,
-            btnStatistiche
+            spacer(2), btnOggetti, btnStatistiche
         );
 
-        // di default: seleziona Home
         select(btnHome);
     }
 
-    // ---------- Helpers testi full vs icon ----------
     private void rememberTexts(Button b, String fullText) {
         b.getProperties().put("fullText", fullText);
         b.getProperties().put("iconText", extractIcon(fullText));
     }
     private String extractIcon(String fullText) {
-        int i = fullText.indexOf("  "); // due spazi dopo l'emoji
-        return (i > 0) ? fullText.substring(0, i) : fullText;
+        int i = fullText.indexOf("  "); return i > 0 ? fullText.substring(0, i) : fullText;
     }
     private String fullTextOf(Button b) {
-        Object o = b.getProperties().get("fullText");
-        return (o instanceof String) ? (String) o : b.getText();
+        Object o = b.getProperties().get("fullText"); return o instanceof String s ? s : b.getText();
     }
     private String iconTextOf(Button b) {
-        Object o = b.getProperties().get("iconText");
-        return (o instanceof String) ? (String) o : extractIcon(b.getText());
+        Object o = b.getProperties().get("iconText"); return o instanceof String s ? s : extractIcon(b.getText());
     }
 
-    // ---------- Styling ----------
     private void styleToggle(ToggleButton t) {
+        String base = "-fx-text-fill: #EAF0FF;-fx-font-size: 16px;-fx-font-weight: 800;-fx-background-radius: 12;-fx-border-radius: 12;-fx-border-color: rgba(255,255,255,0.18);-fx-border-width: 1;-fx-padding: 8 10;";
         t.setMaxWidth(Double.MAX_VALUE);
-        t.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 16px;" +
-            "-fx-font-weight: 800;" +
-            "-fx-background-radius: 12;" +
-            "-fx-border-radius: 12;" +
-            "-fx-border-color: rgba(255,255,255,0.18);" +
-            "-fx-border-width: 1;" +
-            "-fx-padding: 8 10;"
-        );
-        t.setOnMouseEntered(e -> t.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.08);" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 16px; -fx-font-weight: 800;" +
-            "-fx-background-radius: 12; -fx-border-radius: 12;" +
-            "-fx-border-color: rgba(255,255,255,0.18); -fx-border-width: 1;" +
-            "-fx-padding: 8 10;"
-        ));
-        t.setOnMouseExited(e -> t.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 16px; -fx-font-weight: 800;" +
-            "-fx-background-radius: 12; -fx-border-radius: 12;" +
-            "-fx-border-color: rgba(255,255,255,0.18); -fx-border-width: 1;" +
-            "-fx-padding: 8 10;"
-        ));
+        t.setStyle("-fx-background-color: transparent;" + base);
+        t.setOnMouseEntered(e -> t.setStyle("-fx-background-color: rgba(255,255,255,0.08);" + base));
+        t.setOnMouseExited(e -> t.setStyle("-fx-background-color: transparent;" + base));
     }
 
     private Button mainItem(String text, String key) {
         Button btn = new Button(text);
-        btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setAlignment(Pos.CENTER_LEFT);
-        btn.setUserData(key); // può essere null per gli header espandibili
-        btn.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 13px;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 12;"
-        );
-        btn.setOnMouseEntered(e -> btn.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.08);" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 13px;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 12;"
-        ));
-        btn.setOnMouseExited(e -> {
-            if (btn != selectedBtn)
-                btn.setStyle(
-                    "-fx-background-color: transparent;" +
-                    "-fx-text-fill: #EAF0FF;" +
-                    "-fx-font-size: 13px;" +
-                    "-fx-background-radius: 12;" +
-                    "-fx-padding: 10 12;"
-                );
-        });
-        allClickableButtons.add(btn);
-        return btn;
+        btn.setMaxWidth(Double.MAX_VALUE); btn.setAlignment(Pos.CENTER_LEFT); btn.setUserData(key);
+        String base = "-fx-text-fill: #EAF0FF;-fx-font-size: 13px;-fx-background-radius: 12;-fx-padding: 10 12;";
+        btn.setStyle("-fx-background-color: transparent;" + base);
+        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.08);" + base));
+        btn.setOnMouseExited(e -> { if (btn != selectedBtn) btn.setStyle("-fx-background-color: transparent;" + base); });
+        allClickableButtons.add(btn); return btn;
     }
 
     private Button subItem(String text, String key) {
         Button btn = new Button(text);
-        btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setAlignment(Pos.CENTER_LEFT);
-        btn.setUserData(key);
-        btn.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.04);" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 12px;" +
-            "-fx-background-radius: 10;" +
-            "-fx-padding: 8 12;"
-        );
-        btn.setOnMouseEntered(e -> btn.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.10);" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-font-size: 12px;" +
-            "-fx-background-radius: 10;" +
-            "-fx-padding: 8 12;"
-        ));
-        btn.setOnMouseExited(e -> {
-            if (btn != selectedBtn)
-                btn.setStyle(
-                    "-fx-background-color: rgba(255,255,255,0.04);" +
-                    "-fx-text-fill: #EAF0FF;" +
-                    "-fx-font-size: 12px;" +
-                    "-fx-background-radius: 10;" +
-                    "-fx-padding: 8 12;"
-                );
-        });
-        allClickableButtons.add(btn);
-        return btn;
+        btn.setMaxWidth(Double.MAX_VALUE); btn.setAlignment(Pos.CENTER_LEFT); btn.setUserData(key);
+        String base = "-fx-text-fill: #EAF0FF;-fx-font-size: 12px;-fx-background-radius: 10;-fx-padding: 8 12;";
+        btn.setStyle("-fx-background-color: rgba(255,255,255,0.04);" + base);
+        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.10);" + base));
+        btn.setOnMouseExited(e -> { if (btn != selectedBtn) btn.setStyle("-fx-background-color: rgba(255,255,255,0.04);" + base); });
+        allClickableButtons.add(btn); return btn;
     }
 
-    private Region spacer(double h) {
-        Region r = new Region();
-        r.setMinHeight(h);
-        return r;
-    }
+    private Region spacer(double h) { Region r = new Region(); r.setMinHeight(h); return r; }
 
-    // ---------- Selettore visuale ----------
     private void select(Button btn) {
-        // reset stile degli altri
         for (Button b : allClickableButtons) {
             if (b == btn) continue;
-            if (b.getParent() == annunciSubmenu || b.getParent() == offerteSubmenu) {
-                b.setStyle(
-                    "-fx-background-color: rgba(255,255,255,0.04);" +
-                    "-fx-text-fill: #EAF0FF;" +
-                    "-fx-font-size: 12px;" +
-                    "-fx-background-radius: 10;" +
-                    "-fx-padding: 8 12;"
-                );
-            } else {
-                b.setStyle(
-                    "-fx-background-color: transparent;" +
-                    "-fx-text-fill: #EAF0FF;" +
-                    "-fx-font-size: 13px;" +
-                    "-fx-background-radius: 12;" +
-                    "-fx-padding: 10 12;"
-                );
-            }
+            boolean isSub = b.getParent() == annunciSubmenu || b.getParent() == offerteSubmenu;
+            String style = isSub
+                ? "-fx-background-color: rgba(255,255,255,0.04);-fx-text-fill: #EAF0FF;-fx-font-size: 12px;-fx-background-radius: 10;-fx-padding: 8 12;"
+                : "-fx-background-color: transparent;-fx-text-fill: #EAF0FF;-fx-font-size: 13px;-fx-background-radius: 12;-fx-padding: 10 12;";
+            b.setStyle(style);
         }
-        // stile selezionato
         selectedBtn = btn;
-        btn.setStyle(
-            "-fx-background-color: #4f8cff;" +
-            "-fx-text-fill: white;" +
-            "-fx-font-weight: 700;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 12;"
-        );
-        // auto-espandi il relativo submenu
+        btn.setStyle("-fx-background-color: #4f8cff;-fx-text-fill: white;-fx-font-weight: 700;-fx-background-radius: 12;-fx-padding: 10 12;");
         if (btn.getParent() == annunciSubmenu && !annunciExpanded) toggleAnnunciSubmenu();
         if (btn.getParent() == offerteSubmenu && !offerteExpanded) toggleOfferteSubmenu();
     }
 
-    // ---------- Toggle submenu con animazione ----------
     private void toggleAnnunciSubmenu() {
         annunciExpanded = !annunciExpanded;
         animateSubmenu(annunciSubmenu, annunciExpanded);
         btnAnnunciHeader.setText(annunciExpanded ? "📄  Annunci ▼" : "📄  Annunci ▶");
-        rememberTexts(btnAnnunciHeader, btnAnnunciHeader.getText()); // aggiorna freccia nel "fullText"
+        rememberTexts(btnAnnunciHeader, btnAnnunciHeader.getText());
     }
 
     private void toggleOfferteSubmenu() {
         offerteExpanded = !offerteExpanded;
         animateSubmenu(offerteSubmenu, offerteExpanded);
         btnOfferteHeader.setText(offerteExpanded ? "💬  Offerte ▼" : "💬  Offerte ▶");
-        rememberTexts(btnOfferteHeader, btnOfferteHeader.getText()); // aggiorna freccia nel "fullText"
+        rememberTexts(btnOfferteHeader, btnOfferteHeader.getText());
     }
 
     private void animateSubmenu(VBox submenu, boolean expand) {
-        submenu.setManaged(true);
-        submenu.setVisible(true);
-
+        submenu.setManaged(true); submenu.setVisible(true);
         double from = expand ? 0 : submenu.getHeight();
-        double to   = expand ? computeVBoxHeight(submenu) : 0;
+        double to = expand ? computeVBoxHeight(submenu) : 0;
 
-        Timeline heightTl = new Timeline(
+        Timeline h = new Timeline(
             new KeyFrame(Duration.ZERO, new KeyValue(submenu.prefHeightProperty(), from)),
             new KeyFrame(Duration.millis(220), new KeyValue(submenu.prefHeightProperty(), to, Interpolator.EASE_BOTH))
         );
-
-        FadeTransition fade = new FadeTransition(Duration.millis(200), submenu);
-        fade.setFromValue(expand ? 0 : 1);
-        fade.setToValue(expand ? 1 : 0);
-
-        fade.setOnFinished(ev -> {
-            if (!expand) {
-                submenu.setVisible(false);
-                submenu.setManaged(false);
-                submenu.setPrefHeight(Region.USE_COMPUTED_SIZE);
-            } else {
-                submenu.setPrefHeight(Region.USE_COMPUTED_SIZE);
-            }
+        FadeTransition f = new FadeTransition(Duration.millis(200), submenu);
+        f.setFromValue(expand ? 0 : 1); f.setToValue(expand ? 1 : 0);
+        f.setOnFinished(ev -> {
+            if (!expand) { submenu.setVisible(false); submenu.setManaged(false); }
+            submenu.setPrefHeight(Region.USE_COMPUTED_SIZE);
         });
-
-        new ParallelTransition(heightTl, fade).play();
+        new ParallelTransition(h, f).play();
     }
 
     private double computeVBoxHeight(VBox v) {
         double h = v.getInsets().getTop() + v.getInsets().getBottom();
-        for (Node n : v.getChildren()) {
-            h += n.prefHeight(-1) + v.getSpacing();
-        }
+        for (Node n : v.getChildren()) h += n.prefHeight(-1) + v.getSpacing();
         return h;
     }
 
-    // ---------- Toggle menu con animazione larghezza ----------
     private void toggleMenu() {
-        double start = menuBox.getPrefWidth();
-        double end = isVisible ? 60 : 220; // 60px: solo icone
-        Timeline tl = new Timeline(
+        double start = menuBox.getPrefWidth(), end = isVisible ? 60 : 220;
+        new Timeline(
             new KeyFrame(Duration.ZERO, new KeyValue(menuBox.prefWidthProperty(), start)),
             new KeyFrame(Duration.millis(240), new KeyValue(menuBox.prefWidthProperty(), end, Interpolator.EASE_BOTH))
-        );
-        tl.play();
-
-        isVisible = !isVisible;
-        toggleButton.setText(isVisible ? "☰" : "✕");
-
-        // Applica stato collassato/espanso DOPO aver aggiornato isVisible
+        ).play();
+        isVisible = !isVisible; toggleButton.setText(isVisible ? "☰" : "✕");
         applyCollapsedState(!isVisible);
     }
 
     private void applyCollapsedState(boolean collapsed) {
         for (Node n : menuBox.getChildren()) {
             if (n == toggleButton) continue;
-
             if (n instanceof Button b) {
-                String full = fullTextOf(b);
-                String icon = iconTextOf(b);
-
+                String full = fullTextOf(b), icon = iconTextOf(b);
                 if (collapsed) {
-                    // mostra solo l'icona, tooltip col label
                     String label = full.startsWith(icon + "  ") ? full.substring((icon + "  ").length()) : full;
-                    b.setText(icon);
-                    b.setAlignment(Pos.CENTER);
-                    b.setTooltip(new Tooltip(label));
+                    b.setText(icon); b.setAlignment(Pos.CENTER); b.setTooltip(new Tooltip(label));
                 } else {
-                    // ripristina testo completo
-                    b.setText(full);
-                    b.setAlignment(Pos.CENTER_LEFT);
-                    b.setTooltip(null);
+                    b.setText(full); b.setAlignment(Pos.CENTER_LEFT); b.setTooltip(null);
                 }
             } else if (n instanceof VBox v) {
-                // submenu visibili solo se espanso e flag expanded true
-                if (v == annunciSubmenu) {
-                    boolean show = !collapsed && annunciExpanded;
-                    v.setVisible(show);
-                    v.setManaged(show);
-                } else if (v == offerteSubmenu) {
-                    boolean show = !collapsed && offerteExpanded;
-                    v.setVisible(show);
-                    v.setManaged(show);
-                } else {
-                    v.setVisible(!collapsed);
-                    v.setManaged(!collapsed);
-                }
+                boolean show = !collapsed && ((v == annunciSubmenu && annunciExpanded) || (v == offerteSubmenu && offerteExpanded) || (v != annunciSubmenu && v != offerteSubmenu));
+                v.setVisible(show); v.setManaged(show);
             }
         }
-
-        // ripristina testi header con freccia corretta quando espanso
         if (!collapsed) {
-            btnAnnunciHeader.setText(annunciExpanded ? "📄  Annunci ▼" : "📄  Annunci ▶");
-            rememberTexts(btnAnnunciHeader, btnAnnunciHeader.getText());
-            btnOfferteHeader.setText(offerteExpanded ? "💬  Offerte ▼" : "💬  Offerte ▶");
-            rememberTexts(btnOfferteHeader, btnOfferteHeader.getText());
+            btnAnnunciHeader.setText(annunciExpanded ? "📄  Annunci ▼" : "📄  Annunci ▶"); rememberTexts(btnAnnunciHeader, btnAnnunciHeader.getText());
+            btnOfferteHeader.setText(offerteExpanded ? "💬  Offerte ▼" : "💬  Offerte ▶"); rememberTexts(btnOfferteHeader, btnOfferteHeader.getText());
         }
     }
-
-    // ---------- API esistente ----------
+    
     private void notifyMenuSelection(String key) {
         if (onMenuSelection != null) onMenuSelection.accept(key);
     }
@@ -416,7 +246,6 @@ public class SideMenuView {
         return menuBox;
     }
 
-    // ---------- (Opzionale) selezione dall'esterno ----------
     public void select(String key) {
         for (Button b : allClickableButtons) {
             if (key != null && key.equals(b.getUserData())) {
@@ -426,3 +255,4 @@ public class SideMenuView {
         }
     }
 }
+

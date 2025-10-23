@@ -15,7 +15,7 @@ import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import model.Offerta; 
+import model.Offerta;
 
 import java.sql.SQLException;
 import java.util.DoubleSummaryStatistics;
@@ -29,50 +29,31 @@ public class ReportView {
     private VBox root;
     private final Controller controller;
 
-    // --- UI Elements ---
     private PieChart pieChartOfferteInviate;
     private BarChart<String, Number> barChartOfferteAccettate;
-    private Label lblPrezzoMinimo;
-    private Label lblPrezzoMedio;
-    private Label lblPrezzoMassimo;
+    private Label lblPrezzoMinimo, lblPrezzoMedio, lblPrezzoMassimo;
 
-    /**
-     * Costruttore
-     */
     public ReportView(Controller controller) {
         this.controller = controller;
         createUI();
-        refreshData(); 
+        refreshData();
     }
 
-    /**
-     * Crea l'interfaccia utente.
-     */
     private void createUI() {
         root = new VBox(16);
         root.setPadding(new Insets(16));
-        root.setStyle(
-            "-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);" +
-            "-fx-font-family: 'Segoe UI','Roboto','Arial';"
-        );
+        root.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);-fx-font-family: 'Segoe UI','Roboto','Arial';");
 
-        // Header
         Label title = new Label("Statistiche & Report");
         title.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 20px; -fx-font-weight: 900;");
 
-        // --- Card per Statistiche Prezzi (Richiesta 3) ---
-        VBox statsCard = card();
-        statsCard.setSpacing(10);
-        
+        VBox statsCard = card(); statsCard.setSpacing(10);
         Label statsTitle = new Label("Analisi Prezzi (Vendite Accettate)");
         statsTitle.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
 
         GridPane statsGrid = new GridPane();
-        statsGrid.setHgap(40);
-        statsGrid.setVgap(10);
-        statsGrid.setAlignment(Pos.CENTER);
+        statsGrid.setHgap(40); statsGrid.setVgap(10); statsGrid.setAlignment(Pos.CENTER);
 
-        // Inizializziamo le label
         lblPrezzoMinimo = new Label("N/A");
         lblPrezzoMedio = new Label("N/A");
         lblPrezzoMassimo = new Label("N/A");
@@ -80,213 +61,116 @@ public class ReportView {
         statsGrid.add(createStatPane("Prezzo Minimo", lblPrezzoMinimo), 0, 0);
         statsGrid.add(createStatPane("Prezzo Medio", lblPrezzoMedio), 1, 0);
         statsGrid.add(createStatPane("Prezzo Massimo", lblPrezzoMassimo), 2, 0);
-
         statsCard.getChildren().addAll(statsTitle, statsGrid);
 
-
-        // --- Grafico a Torta (Richiesta 1: Offerte Inviate per Tipo) ---
         pieChartOfferteInviate = new PieChart();
-        stylePieChart(pieChartOfferteInviate); 
+        stylePieChart(pieChartOfferteInviate);
         Label pieTitle = new Label("Offerte Inviate per Tipologia");
         pieTitle.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
-        VBox pieChartContainer = new VBox(10, pieTitle, pieChartOfferteInviate);
-        pieChartContainer.setAlignment(Pos.TOP_CENTER);
-        VBox pieCard = card();
-        pieCard.getChildren().add(pieChartContainer);
+        VBox pieCard = card(); pieCard.getChildren().add(new VBox(10, pieTitle, pieChartOfferteInviate));
 
-        // --- Grafico a Barre (Richiesta 2: Offerte Accettate per Tipo) ---
         CategoryAxis xAxisBar = new CategoryAxis();
         NumberAxis yAxisBar = new NumberAxis();
         barChartOfferteAccettate = new BarChart<>(xAxisBar, yAxisBar);
-        styleBarChart(barChartOfferteAccettate); 
+        styleBarChart(barChartOfferteAccettate);
         Label barTitle = new Label("Offerte Inviate (Accettate per Tipo)");
         barTitle.setStyle("-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
-        VBox barChartContainer = new VBox(10, barTitle, barChartOfferteAccettate);
-        barChartContainer.setAlignment(Pos.TOP_CENTER);
-        VBox barCard = card();
-        barCard.getChildren().add(barChartContainer);
+        VBox barCard = card(); barCard.getChildren().add(new VBox(10, barTitle, barChartOfferteAccettate));
 
-        // --- Layout dei grafici ---
         GridPane chartsGrid = new GridPane();
-        chartsGrid.setHgap(16);
-        chartsGrid.setVgap(16);
-        chartsGrid.add(pieCard, 0, 0); 
-        chartsGrid.add(barCard, 1, 0); 
+        chartsGrid.setHgap(16); chartsGrid.setVgap(16);
+        chartsGrid.add(pieCard, 0, 0);
+        chartsGrid.add(barCard, 1, 0);
 
         root.getChildren().addAll(title, statsCard, chartsGrid);
     }
 
-    /**
-     * Carica ed elabora i dati per popolare le statistiche e i grafici.
-     * Questo metodo ora è pubblico per essere chiamato dall'esterno.
-     */
-    public void refreshData() { 
+    public void refreshData() {
         try {
             String matricola = controller.getUtenteCorrente().getMatricola();
-            
-            // --- MODIFICA: Carica entrambe le liste ---
-            // Dati per Richieste 1 & 2 (Grafici)
+
             List<Offerta> offerteInviate = controller.getOfferteInviateByUtente(matricola);
-            // Dati per Richiesta 3 (Statistiche Prezzi)
-            List<Offerta> offerteRicevute = controller.getOfferteRicevuteByUtente(matricola); 
-            // --- FINE MODIFICA ---
+            List<Offerta> offerteRicevute = controller.getOfferteRicevuteByUtente(matricola);
 
-
-            // --- 1. Statistiche Prezzi (Richiesta 3) ---
-            // MODIFICA: Basato su offerteRicevute (offerte che ho accettato)
-            List<Offerta> venditeAccettate = offerteRicevute.stream() // <-- USA LISTA CORRETTA
-                .filter(o -> "vendita".equalsIgnoreCase(o.getTipo()) && 
-                             "accettata".equalsIgnoreCase(o.getStato()) &&
-                             o.getPrezzoOfferto() != null)
+            List<Offerta> venditeAccettate = offerteRicevute.stream()
+                .filter(o -> "vendita".equalsIgnoreCase(o.getTipo()) && "accettata".equalsIgnoreCase(o.getStato()) && o.getPrezzoOfferto() != null)
                 .collect(Collectors.toList());
 
-            DoubleSummaryStatistics statsPrezzi = venditeAccettate.stream()
-                .mapToDouble(Offerta::getPrezzoOfferto)
-                .summaryStatistics();
-
-            if (statsPrezzi.getCount() > 0) {
-                lblPrezzoMinimo.setText(String.format(Locale.ITALY, "€ %.2f", statsPrezzi.getMin()));
-                lblPrezzoMedio.setText(String.format(Locale.ITALY, "€ %.2f", statsPrezzi.getAverage()));
-                lblPrezzoMassimo.setText(String.format(Locale.ITALY, "€ %.2f", statsPrezzi.getMax()));
+            DoubleSummaryStatistics s = venditeAccettate.stream().mapToDouble(Offerta::getPrezzoOfferto).summaryStatistics();
+            if (s.getCount() > 0) {
+                lblPrezzoMinimo.setText(String.format(Locale.ITALY, "€ %.2f", s.getMin()));
+                lblPrezzoMedio.setText(String.format(Locale.ITALY, "€ %.2f", s.getAverage()));
+                lblPrezzoMassimo.setText(String.format(Locale.ITALY, "€ %.2f", s.getMax()));
             } else {
-                lblPrezzoMinimo.setText("N/A");
-                lblPrezzoMedio.setText("N/A");
-                lblPrezzoMassimo.setText("N/A");
+                lblPrezzoMinimo.setText("N/A"); lblPrezzoMedio.setText("N/A"); lblPrezzoMassimo.setText("N/A");
             }
 
-            // --- 2. Grafico Torta: Offerte Inviate per Tipo (Richiesta 1) ---
-            // (Corretto: basato su offerteInviate)
-            Map<String, Long> inviatePerTipo = offerteInviate.stream()
-                .collect(Collectors.groupingBy(Offerta::getTipo, Collectors.counting()));
+            Map<String, Long> inviatePerTipo = offerteInviate.stream().collect(Collectors.groupingBy(Offerta::getTipo, Collectors.counting()));
+            ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList();
+            inviatePerTipo.forEach((tipo, count) -> pieData.add(new PieChart.Data(tipo + " (" + count + ")", count)));
+            pieChartOfferteInviate.getData().setAll(pieData);
 
-            ObservableList<PieChart.Data> pieChartData = FXCollections.observableArrayList();
-            inviatePerTipo.forEach((tipo, count) -> 
-                pieChartData.add(new PieChart.Data(tipo + " (" + count + ")", count))
-            );
-            
-            pieChartOfferteInviate.getData().clear();
-            pieChartOfferteInviate.setData(pieChartData);
+            List<Offerta> inviateAccettate = offerteInviate.stream().filter(o -> "accettata".equalsIgnoreCase(o.getStato())).collect(Collectors.toList());
+            Map<String, Long> accettatePerTipo = inviateAccettate.stream().collect(Collectors.groupingBy(Offerta::getTipo, Collectors.counting()));
+            XYChart.Series<String, Number> series = new XYChart.Series<>(); series.setName("N. Offerte Accettate");
+            accettatePerTipo.forEach((tipo, count) -> series.getData().add(new XYChart.Data<>(tipo, count)));
+            barChartOfferteAccettate.getData().setAll(series); barChartOfferteAccettate.setLegendVisible(false);
 
-
-            // --- 3. Grafico Barre: Offerte Accettate per Tipo (Richiesta 2) ---
-            // (Corretto: basato su offerteInviate che sono state accettate)
-            List<Offerta> offerteInviateAccettate = offerteInviate.stream()
-                .filter(o -> "accettata".equalsIgnoreCase(o.getStato()))
-                .collect(Collectors.toList());
-
-            Map<String, Long> accettatePerTipo = offerteInviateAccettate.stream()
-                .collect(Collectors.groupingBy(Offerta::getTipo, Collectors.counting()));
-
-            XYChart.Series<String, Number> series = new XYChart.Series<>();
-            series.setName("N. Offerte Accettate");
-
-            accettatePerTipo.forEach((tipo, count) -> 
-                series.getData().add(new XYChart.Data<>(tipo, count))
-            );
-            
-            barChartOfferteAccettate.getData().clear();
-            barChartOfferteAccettate.getData().setAll(series);
-            barChartOfferteAccettate.setLegendVisible(false); 
-
-        } catch (SQLException e) {
-            warn("Errore nel caricamento delle statistiche: " + e.getMessage());
-        }
+        } catch (SQLException e) { warn("Errore nel caricamento delle statistiche: " + e.getMessage()); }
     }
 
-
-    // ============================== Helpers UI ==============================
-
     private VBox createStatPane(String title, Label valueLabel) {
-        VBox pane = new VBox(5);
-        pane.setAlignment(Pos.CENTER);
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px;");
+        VBox pane = new VBox(5); pane.setAlignment(Pos.CENTER);
+        Label t = new Label(title); t.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px;");
         valueLabel.setStyle("-fx-text-fill: #FFFFFF; -fx-font-size: 22px; -fx-font-weight: 700;");
-        pane.getChildren().addAll(titleLabel, valueLabel);
-        return pane;
+        pane.getChildren().addAll(t, valueLabel); return pane;
     }
 
     private VBox card() {
-        VBox card = new VBox();
-        card.setPadding(new Insets(16));
-        card.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.06);" +
-            "-fx-background-radius: 18;" +
-            "-fx-border-radius: 18;" +
-            "-fx-border-color: rgba(255,255,255,0.10);" +
-            "-fx-border-width: 1;"
-        );
-        card.setEffect(new DropShadow(24, Color.color(0, 0, 0, 0.45)));
-        return card;
+        VBox card = new VBox(); card.setPadding(new Insets(16));
+        card.setStyle("-fx-background-color: rgba(255,255,255,0.06);-fx-background-radius: 18;-fx-border-radius: 18;-fx-border-color: rgba(255,255,255,0.10);-fx-border-width: 1;");
+        card.setEffect(new DropShadow(24, Color.color(0, 0, 0, 0.45))); return card;
     }
 
-    // ============================== Helpers Stile Grafici ==============================
-
     private void stylePieChart(PieChart chart) {
-        chart.setTitle(null); 
-        chart.setLabelLineLength(20);
-        chart.setLegendVisible(true);
-        chart.setStyle("-fx-background-color: transparent;");
-
-        chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                applyPieChartStyles(chart);
-            }
-        });
+        chart.setTitle(null); chart.setLabelLineLength(20); chart.setLegendVisible(true); chart.setStyle("-fx-background-color: transparent;");
+        chart.sceneProperty().addListener((o, os, ns) -> { if (ns != null) applyPieChartStyles(chart); });
     }
 
     private void applyPieChartStyles(PieChart chart) {
         Platform.runLater(() -> {
-            chart.lookupAll(".chart-pie-label").forEach(node -> {
-                node.setStyle("-fx-fill: white; -fx-font-size: 11px;");
-            });
+            chart.lookupAll(".chart-pie-label").forEach(n -> n.setStyle("-fx-fill: white; -fx-font-size: 11px;"));
             Node legend = chart.lookup(".chart-legend");
             if (legend != null) {
                 legend.setStyle("-fx-background-color: transparent;");
+                chart.lookupAll(".chart-legend .label").forEach(l -> l.setStyle("-fx-text-fill: white;"));
             }
-            chart.lookupAll(".chart-legend .label").forEach(label -> {
-                label.setStyle("-fx-text-fill: white;");
-            });
         });
     }
 
     private void styleBarChart(BarChart<String, Number> chart) {
-        chart.setTitle(null); 
+        chart.setTitle(null);
         chart.getXAxis().setStyle("-fx-tick-label-fill: white; -fx-font-size: 10px;");
         chart.getYAxis().setStyle("-fx-tick-label-fill: white;");
         chart.setStyle("-fx-background-color: transparent;");
-
-        chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) {
-                applyBarChartStyles(chart);
-            }
-        });
+        chart.sceneProperty().addListener((o, os, ns) -> { if (ns != null) applyBarChartStyles(chart); });
     }
 
     private void applyBarChartStyles(BarChart<String, Number> chart) {
         Platform.runLater(() -> {
-            for (Node n : chart.lookupAll(".chart-bar")) {
-                n.setStyle("-fx-bar-fill: #4f8cff;"); 
-            }
+            for (Node n : chart.lookupAll(".chart-bar")) n.setStyle("-fx-bar-fill: #4f8cff;");
             Node legend = chart.lookup(".chart-legend");
             if (legend != null) {
                 legend.setStyle("-fx-background-color: transparent;");
-                chart.lookupAll(".chart-legend .label").forEach(label -> {
-                    label.setStyle("-fx-text-fill: white;");
-                });
+                chart.lookupAll(".chart-legend .label").forEach(l -> l.setStyle("-fx-text-fill: white;"));
             }
         });
     }
 
-    // ============================== Metodi Pubblici / Warning ==============================
+    public VBox getRoot() { return root; }
 
-    public VBox getRoot() {
-        return root;
-    }
-    
     private void warn(String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
-        a.setHeaderText(null);
-        a.showAndWait();
+        a.setHeaderText(null); a.showAndWait();
     }
 }

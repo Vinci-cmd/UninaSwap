@@ -6,35 +6,22 @@ import model.Utente;
 public class UtenteDAO {
     private final Connection conn;
 
-    public UtenteDAO(Connection conn) {
-        this.conn = conn;
-    }
+    public UtenteDAO(Connection conn) { this.conn = conn; }
 
     public Utente login(String email, String password) throws SQLException {
         String sql = "SELECT * FROM utente WHERE email = ? AND password = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, email);
-            ps.setString(2, password);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return extractUtente(rs);
-                }
-            }
+            ps.setString(1, email); ps.setString(2, password);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? extractUtente(rs) : null; }
         }
-        return null;
     }
 
     public Utente getUtenteByMatricola(String matricola) throws SQLException {
         String sql = "SELECT * FROM utente WHERE matricola = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, matricola);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return extractUtente(rs);
-                }
-            }
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? extractUtente(rs) : null; }
         }
-        return null;
     }
 
     public boolean creaUtente(Utente utente) throws SQLException {
@@ -65,13 +52,12 @@ public class UtenteDAO {
 
     public boolean eliminaUtente(String matricola) throws SQLException {
         String sql = "DELETE FROM utente WHERE matricola = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, matricola);
-            return ps.executeUpdate() == 1;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { 
+            ps.setString(1, matricola); 
+            return ps.executeUpdate() == 1; 
         }
     }
 
-    // Metodo per evitare duplicazione codice (senza dover scrivere sempre rs.getstring e.c.c)
     private Utente extractUtente(ResultSet rs) throws SQLException {
         return new Utente(
             rs.getString("matricola"),

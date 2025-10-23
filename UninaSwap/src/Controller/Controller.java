@@ -26,7 +26,6 @@ public class Controller {
     private OffertaDAO offertaDAO;
     private OffreDAO offreDAO;
     private OggettoDAO oggettoDAO;
-    private TipoConsegnaDAO tipoConsegnaDAO;
     private UtenteDAO utenteDAO;
 
     private Utente utenteCorrente;
@@ -41,7 +40,6 @@ public class Controller {
         this.offertaDAO = new OffertaDAO(conn);
         this.offreDAO = new OffreDAO(conn);
         this.oggettoDAO = new OggettoDAO(conn);
-        this.tipoConsegnaDAO = new TipoConsegnaDAO(conn);
         this.utenteDAO = new UtenteDAO(conn);
     }
 
@@ -648,34 +646,6 @@ public boolean compraSubito(String codiceAnnuncio) throws SQLException {
     // =========================================================
     // == TIPI CONSEGNA
     // =========================================================
-
-    /**
-     * Crea tipo consegna.
-     */
-    public boolean creaTipoConsegna(TipoConsegna consegna) throws SQLException {
-        return tipoConsegnaDAO.creaTipoConsegna(consegna);
-    }
-
-    /**
-     * Aggiorna tipo consegna.
-     */
-    public boolean aggiornaTipoConsegna(TipoConsegna consegna) throws SQLException {
-        return tipoConsegnaDAO.aggiornaTipoConsegna(consegna);
-    }
-
-    /**
-     * Elimina tipo consegna.
-     */
-    public boolean eliminaTipoConsegna(String codiceConsegna) throws SQLException {
-        return tipoConsegnaDAO.eliminaTipoConsegna(codiceConsegna);
-    }
-
-    /**
-     * Consegne associate a un annuncio.
-     */
-    public List<TipoConsegna> getConsegneByAnnuncio(String codiceAnnuncio) throws SQLException {
-        return tipoConsegnaDAO.getConsegneByAnnuncio(codiceAnnuncio);
-    }
 
     // =========================================================
     // == STATISTICHE
