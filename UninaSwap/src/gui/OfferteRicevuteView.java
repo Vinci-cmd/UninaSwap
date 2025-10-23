@@ -27,7 +27,6 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 public class OfferteRicevuteView {
 
@@ -133,6 +132,38 @@ public class OfferteRicevuteView {
         colTipo.setCellValueFactory(new PropertyValueFactory<>("tipo"));
         colTipo.setPrefWidth(100);
 
+        // ================== NUOVA COLONNA PREZZO ==================
+        TableColumn<Offerta, String> colPrezzo = new TableColumn<>("Prezzo Offerto");
+        colPrezzo.setCellValueFactory(cd -> {
+            Offerta o = cd.getValue();
+            String textToShow = "—"; // Default: dash
+            if (o != null && "vendita".equals(o.getTipo()) && o.getPrezzoOfferto() != null) {
+                // Formatta come valuta (es. € 10,50)
+                textToShow = String.format(java.util.Locale.ITALY, "€ %.2f", o.getPrezzoOfferto());
+            }
+            return new javafx.beans.property.SimpleStringProperty(textToShow);
+        });
+        colPrezzo.setPrefWidth(120);
+        // Aggiungiamo una CellFactory per allineare il testo
+        colPrezzo.setCellFactory(col -> new TableCell<Offerta, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                    // Allinea a destra se è un prezzo, altrimenti centra
+                    if (item.startsWith("€")) {
+                        setAlignment(Pos.CENTER_RIGHT);
+                    } else {
+                        setAlignment(Pos.CENTER);
+                    }
+                }
+            }
+        });
+        // ================== FINE NUOVA COLONNA ==================
+
         TableColumn<Offerta, String> colStato = new TableColumn<>("Stato");
         colStato.setCellValueFactory(new PropertyValueFactory<>("stato"));
         colStato.setPrefWidth(120);
@@ -169,7 +200,8 @@ public class OfferteRicevuteView {
         });
         colAzioni.setPrefWidth(150);
 
-        tableOfferte.getColumns().addAll(colCodice, colAnnuncio, colMittente, colTipo, colStato, colData, colAzioni);
+        // Aggiunta la colonna 'colPrezzo' alla tabella
+        tableOfferte.getColumns().addAll(colCodice, colAnnuncio, colMittente, colTipo, colPrezzo, colStato, colData, colAzioni);
         tableOfferte.setPrefHeight(440);
 
         tableOfferte.setRowFactory(tv -> {
@@ -314,7 +346,8 @@ public class OfferteRicevuteView {
         
         if ("vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() != null) {
             grid.add(l("Prezzo offerto:"), 0, r);
-            grid.add(valueLabel.apply("€" + String.format("%.2f", offerta.getPrezzoOfferto())), 1, r++);
+            // Uso Locale.ITALY per coerenza con la tabella
+            grid.add(valueLabel.apply("€" + String.format(java.util.Locale.ITALY, "%.2f", offerta.getPrezzoOfferto())), 1, r++);
         }
         
         if (offerta.getMessaggio() != null && !offerta.getMessaggio().isBlank()) {

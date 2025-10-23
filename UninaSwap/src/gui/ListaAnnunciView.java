@@ -223,7 +223,7 @@ public class ListaAnnunciView {
         actions.getChildren().addAll(bDetail, bOffer);
 
         emptyLabel = new Label("Nessun annuncio corrisponde ai filtri.");
-        emptyLabel.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px;"); // Colore corretto
+        emptyLabel.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 12px;");
         emptyLabel.setVisible(false);
         emptyLabel.setManaged(false);
 
@@ -236,7 +236,9 @@ public class ListaAnnunciView {
         try {
             String matricolaUtente = controller.getUtenteCorrente().getMatricola();
             masterData.setAll(controller.getAnnunciAttiviRaw().stream()
-                .filter(a -> !a.getMatricola().equals(matricolaUtente))
+                // Filtra solo annunci "attivi" E non miei
+                .filter(a -> "attivo".equalsIgnoreCase(a.getStato()) && 
+                             !a.getMatricola().equals(matricolaUtente))
                 .collect(Collectors.toList()));
 
             categorie = masterData.stream()
@@ -271,6 +273,8 @@ public class ListaAnnunciView {
 
         filtered.setPredicate(a -> {
             if (a == null) return false;
+            // Aggiunto filtro per stato, non si sa mai (anche se reloadData lo fa già)
+            if (!"attivo".equalsIgnoreCase(a.getStato())) return false; 
 
             if (tip != null && !"Tutte le tipologie".equals(tip)) {
                 if (!tip.equalsIgnoreCase(a.getTipologia())) return false;
@@ -288,8 +292,8 @@ public class ListaAnnunciView {
             }
             if (!query.isBlank()) {
                 return (a.getCategoria() != null && a.getCategoria().toLowerCase().contains(query)) ||
-                       (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(query)) ||
-                       (a.getCodiceAnnuncio() != null && a.getCodiceAnnuncio().toLowerCase().contains(query));
+                    (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(query)) ||
+                    (a.getCodiceAnnuncio() != null && a.getCodiceAnnuncio().toLowerCase().contains(query));
             }
             return true;
         });
@@ -364,21 +368,67 @@ public class ListaAnnunciView {
                 Label prezzoRichiesto = l("Prezzo richiesto: €" + String.format(Locale.ITALY, "%.2f", annuncio.getPrezzo()));
                 prezzoRichiesto.setStyle("-fx-text-fill: #7af7c3; -fx-font-size: 14px; -fx-font-weight: 800;");
                 TextField tfPrezzo = styledTextField("Prezzo offerto");
-                Button conferma = primaryButton("Invia offerta", () -> {
+
+                // --- MODIFICHE QUI ---
+                
+                // Pulsante 1: Per fare un'offerta (prezzo custom)
+                Button confermaOfferta = primaryButton("Fai un'offerta", () -> {
                     try {
                         if (tfPrezzo.getText().isBlank()) {
                             warn("Inserisci il prezzo offerto.");
                             return;
                         }
-                        double prezzo = Double.parseDouble(tfPrezzo.getText().replace(",", "."));
-                        controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "vendita", prezzo);
+                        double prezzoOfferto = Double.parseDouble(tfPrezzo.getText().replace(",", "."));
+                        
+                        if (prezzoOfferto > annuncio.getPrezzo()) {
+                             warn("La tua offerta non può superare il prezzo richiesto. Usa 'Compra Subito' se vuoi pagare il prezzo pieno.");
+                             return;
+                        }
+                        
+                        if (prezzoOfferto <= 0) {
+                             warn("L'offerta deve essere maggiore di zero.");
+                             return;
+                        }
+
+                        controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "vendita", prezzoOfferto);
                         dialog.close();
                         warn("Offerta inviata!");
+                    } catch (NumberFormatException ex) {
+                        warn("Inserisci un prezzo valido.");
                     } catch (Exception ex) {
                         warn("Errore invio offerta: " + ex.getMessage());
                     }
                 });
-                HBox btns = new HBox(10, ghostButton("Annulla", dialog::close), conferma);
+
+                // Pulsante 2: Per il Compra Subito (logica aggiornata)
+                Button compraSubito = successButton("Compra Subito", () -> {
+                    double prezzoPieno = annuncio.getPrezzo();
+                    
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("Conferma Acquisto");
+                    alert.setHeaderText("Confermi l'acquisto immediato?");
+                    alert.setContentText("Stai per acquistare questo oggetto a €" + String.format(Locale.ITALY, "%.2f", prezzoPieno) + ".\n\nLa transazione sarà immediata e non richiederà l'approvazione del venditore.");
+                    
+                    Optional<ButtonType> result = alert.showAndWait();
+                    if (result.isPresent() && result.get() == ButtonType.OK) {
+                        try {
+                            // --- CHIAMATA ALLA NUOVA LOGICA DEL CONTROLLER ---
+                            if (controller.compraSubito(annuncio.getCodiceAnnuncio())) {
+                                dialog.close();
+                                warn("Acquisto completato con successo!");
+                                reloadData(); // <-- Aggiorna la tabella per rimuovere l'annuncio
+                            } else {
+                                // Questo 'else' è per sicurezza, ma gli errori dovrebbero lanciare eccezioni
+                                warn("Errore: Impossibile completare l'acquisto.");
+                            }
+                        } catch (Exception ex) {
+                            warn("Errore acquisto: " + ex.getMessage());
+                        }
+                    }
+                });
+                // --- FINE MODIFICHE ---
+
+                HBox btns = new HBox(10, ghostButton("Annulla", dialog::close), confermaOfferta, compraSubito);
                 btns.setAlignment(Pos.CENTER_RIGHT);
                 card.getChildren().addAll(prezzoRichiesto, tfPrezzo, btns);
             }
@@ -406,16 +456,16 @@ public class ListaAnnunciView {
             case "scambio" -> {
                 try {
                     List<Oggetto> oggettiPersonali = controller.getOggettiUtenteObj(controller.getUtenteCorrente().getMatricola())
-                            .stream()
-                            .filter(o -> o.getCodiceAnnuncio() == null)
-                            .collect(Collectors.toList());
+                        .stream()
+                        .filter(o -> o.getCodiceAnnuncio() == null) // Filtra oggetti non già impegnati
+                        .collect(Collectors.toList());
                     if (oggettiPersonali.isEmpty()) {
                         warn("Non hai oggetti disponibili per lo scambio!");
                         dialog.close();
                         return;
                     }
                     mostraDialogScambio(annuncio, oggettiPersonali);
-                    dialog.close(); // Chiude il dialog di "transizione"
+                    dialog.close(); 
                 } catch (Exception ex) {
                     warn("Errore caricamento oggetti: " + ex.getMessage());
                 }
@@ -570,6 +620,21 @@ public class ListaAnnunciView {
         b.setOnMouseExited(e -> b.setStyle("-fx-background-color: #4f8cff;" + baseStyle));
         return b;
     }
+    
+    // --- NUOVO METODO HELPER PER IL PULSANTE "COMPRA SUBITO" ---
+    private Button successButton(String text, Runnable action) {
+        Button b = new Button(text);
+        b.setOnAction(e -> action.run());
+        final String baseStyle = "-fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700; -fx-text-fill: white;";
+        // Colore verde
+        final String normalColor = "-fx-background-color: #43a047;"; 
+        final String hoverColor = "-fx-background-color: #388e3c;"; 
+        b.setStyle(normalColor + baseStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverColor + baseStyle));
+        b.setOnMouseExited(e -> b.setStyle(normalColor + baseStyle));
+        return b;
+    }
+    // --- FINE NUOVO METODO ---
 
     private Button ghostButton(String text, Runnable action) {
         Button b = new Button(text);
@@ -625,12 +690,15 @@ public class ListaAnnunciView {
     private Label statoBadge(String stato) {
         Label badge = new Label(stato.toUpperCase());
         String bg = switch (stato.toLowerCase()) {
+            // --- MODIFICA: Aggiunto stato "concluso" ---
             case "attivo" -> "rgba(122,247,195,0.25)";
+            case "concluso" -> "rgba(79,140,255,0.25)"; // Blu
             case "scaduto" -> "rgba(255,107,107,0.25)";
             default -> "rgba(255,255,255,0.18)";
         };
         String color = switch (stato.toLowerCase()) {
             case "attivo" -> "#7af7c3";
+            case "concluso" -> "#4f8cff"; // Blu
             case "scaduto" -> "#ff6b6b";
             default -> "#EAF0FF";
         };

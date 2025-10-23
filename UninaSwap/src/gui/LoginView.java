@@ -78,7 +78,7 @@ public class LoginView {
         subtitle.setStyle("-fx-text-fill: #A8B1C6; -fx-font-size: 12px;");
 
         Label emailLbl = smallLabel("Email");
-        emailField = styledTextField("es. nome.cognome@unina.it");
+        emailField = styledTextField("es. nome.cognome@studenti.unina.it");
 
         Label passLbl = smallLabel("Password");
         passwordField = styledPasswordField("Inserisci la tua password");

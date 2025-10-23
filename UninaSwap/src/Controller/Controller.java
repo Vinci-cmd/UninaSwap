@@ -30,11 +30,13 @@ public class Controller {
     private UtenteDAO utenteDAO;
 
     private Utente utenteCorrente;
+    private Connection conn; // Campo per la connessione
 
     // =========================================================
     // == COSTRUTTORE
     // =========================================================
     public Controller(Connection conn) {
+        this.conn = conn; // Salvata la connessione
         this.annuncioDAO = new AnnuncioDAO(conn);
         this.offertaDAO = new OffertaDAO(conn);
         this.offreDAO = new OffreDAO(conn);
@@ -165,7 +167,7 @@ public class Controller {
             for (Annuncio a : annunci) {
                 String prezzo = (a.getPrezzo() != null) ? "€" + a.getPrezzo() : "Gratis";
                 String formatted = String.format("[%s] %s - %s - %s",
-                        a.getTipologia().toUpperCase(), a.getCategoria(), prezzo, a.getStato().toUpperCase());
+                    a.getTipologia().toUpperCase(), a.getCategoria(), prezzo, a.getStato().toUpperCase());
                 items.add(formatted);
             }
             if (items.isEmpty()) items.add("Nessun annuncio trovato");
@@ -211,14 +213,14 @@ public class Controller {
     public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo) throws SQLException {
         Date oggi = new Date(System.currentTimeMillis());
         Annuncio nuovoAnnuncio = new Annuncio(
-                null,
-                descrizione,
-                categoria,
-                tipologia,
-                prezzo,
-                "attivo",
-                oggi,
-                utenteCorrente.getMatricola()
+            null,
+            descrizione,
+            categoria,
+            tipologia,
+            prezzo,
+            "attivo",
+            oggi,
+            utenteCorrente.getMatricola()
         );
         return annuncioDAO.creaAnnuncio(nuovoAnnuncio);
     }
@@ -235,14 +237,14 @@ public class Controller {
         Annuncio esistente = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
 
         Annuncio aggiornato = new Annuncio(
-                codiceAnnuncio,
-                descrizione,
-                categoria,
-                tipologia,
-                prezzo,
-                stato,
-                esistente.getDataPubblicazione(),
-                esistente.getMatricola()
+            codiceAnnuncio,
+            descrizione,
+            categoria,
+            tipologia,
+            prezzo,
+            stato,
+            esistente.getDataPubblicazione(),
+            esistente.getMatricola()
         );
 
         return annuncioDAO.aggiornaAnnuncio(aggiornato);
@@ -343,6 +345,8 @@ public class Controller {
         offerta.setMatricola(utenteCorrente.getMatricola());
         offerta.setStato("inviata");
         offerta.setCodiceOfferta(UUID.randomUUID().toString());
+        // Aggiungo la data
+        offerta.setData(new Date(System.currentTimeMillis()));
         return inviaOfferta(offerta, null);
     }
 
@@ -358,6 +362,8 @@ public class Controller {
         offerta.setStato("inviata");
         offerta.setMessaggio(messaggio);
         offerta.setCodiceOfferta(UUID.randomUUID().toString());
+        // Aggiungo la data
+        offerta.setData(new Date(System.currentTimeMillis()));
         return offertaDAO.creaOfferta(offerta);
     }
 
@@ -371,6 +377,8 @@ public class Controller {
         offerta.setMatricola(utenteCorrente.getMatricola());
         offerta.setStato("inviata");
         offerta.setCodiceOfferta(UUID.randomUUID().toString());
+        // Aggiungo la data
+        offerta.setData(new Date(System.currentTimeMillis()));
         return inviaOfferta(offerta, codiciOggetti);
     }
 
@@ -404,6 +412,98 @@ public class Controller {
     public boolean eliminaOfferta(String codiceOfferta) throws SQLException {
         return offertaDAO.eliminaOfferta(codiceOfferta);
     }
+
+
+    /**
+     * Esegue un acquisto immediato di un annuncio.
+     * Questa operazione è atomica (transazionale):
+     * 1. Marca l'annuncio come "concluso".
+     * 2. Crea un'offerta GIA' ACCETTATA per tracciare la vendita.
+     * 3. Rifiuta tutte le altre offerte "inviate" per quell'annuncio.
+     *
+     * @param codiceAnnuncio Il codice dell'annuncio da acquistare.
+     * @return true se l'acquisto è andato a buon fine.
+     * @throws SQLException Se c'è un errore DB o logico.
+     */
+    public boolean compraSubito(String codiceAnnuncio) throws SQLException {
+        
+        // Prendi i dettagli dell'acquirente (l'utente corrente)
+        String matricolaBuyer = getUtenteCorrente().getMatricola();
+
+        // 1. Ottieni i dettagli dell'annuncio (prezzo e venditore)
+        Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+
+        // --- VALIDAZIONE LOGICA ---
+        if (annuncio == null) {
+            throw new SQLException("Annuncio non trovato.");
+        }
+        if (!"attivo".equals(annuncio.getStato())) {
+            throw new SQLException("Questo annuncio non è più attivo.");
+        }
+        if (annuncio.getMatricola().equals(matricolaBuyer)) {
+            throw new SQLException("Non puoi acquistare un tuo annuncio.");
+        }
+        if (!"vendita".equals(annuncio.getTipologia()) || annuncio.getPrezzo() == null) {
+            throw new SQLException("Questo annuncio non è in vendita o non ha un prezzo.");
+        }
+
+        double prezzoPieno = annuncio.getPrezzo();
+
+        try {
+            // --- INIZIO TRANSAZIONE ---
+            conn.setAutoCommit(false);
+
+            // =========================================================
+            // == MODIFICA: Uso il nuovo metodo aggiornaStatoAnnuncio ==
+            // =========================================================
+            // 1. Aggiorna l'annuncio a "concluso"
+            // Uso il nuovo metodo 'aggiornaStatoAnnuncio' del DAO per modificare SOLO lo stato
+            boolean statoAggiornato = annuncioDAO.aggiornaStatoAnnuncio(annuncio.getCodiceAnnuncio(), "venduto");
+            if (!statoAggiornato) {
+                // Se non si aggiorna, forzo il rollback
+                throw new SQLException("Impossibile aggiornare lo stato dell'annuncio a 'concluso'.");
+            }
+            // =========================================================
+            // =========================================================
+
+            // 2. Crea l'offerta GIA' ACCETTATA per tracciare la vendita
+            Offerta offerta = new Offerta();
+            offerta.setCodiceOfferta(UUID.randomUUID().toString());
+            offerta.setCodiceAnnuncio(codiceAnnuncio);
+            offerta.setMatricola(matricolaBuyer);
+            offerta.setTipo("vendita");
+            offerta.setPrezzoOfferto(prezzoPieno);
+            offerta.setStato("accettata"); // <-- GIA' ACCETTATA
+            offerta.setData(new Date(System.currentTimeMillis()));
+            offerta.setMessaggio("Acquisto 'Compra Subito'");
+            
+            offertaDAO.creaOfferta(offerta);
+            
+            // 3. Rifiuta tutte le ALTRE offerte "inviate" per questo annuncio
+            List<Offerta> altreOfferte = offertaDAO.getOfferteByCodiceAnnuncio(codiceAnnuncio);
+            for (Offerta o : altreOfferte) {
+                if ("inviata".equals(o.getStato())) {
+                    offertaDAO.rifiutaOfferta(o.getCodiceOfferta());
+                }
+            }
+
+            // --- FINE TRANSAZIONE ---
+            conn.commit();
+            return true;
+
+        } catch (Exception e) {
+            // Se qualcosa va storto, annulla tutto
+            conn.rollback();
+            
+            // =========================================================
+            // == MODIFICA: Corretto il typo nell'errore ==
+            // =========================================================
+            throw new SQLException("Errore durante la transazione di acquisto: " + e.getMessage());
+        } finally {
+            conn.setAutoCommit(true);
+        }
+    }
+
 
     // =========================================================
     // == OGGETTI

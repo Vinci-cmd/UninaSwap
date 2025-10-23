@@ -47,50 +47,43 @@ public class HomePageView {
             switch (key) {
                 case "home": {
                     Node newContent = createHomeContentArea();
-                    root.getChildren().set(1, newContent);
-                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                    switchCenterContent(newContent);
                     break;
                 }
                 case "annunci_gestisci": {
                     AnnunciView annunciView = new AnnunciView(controller);
                     Node newContent = annunciView.getRoot();
-                    root.getChildren().set(1, newContent);
-                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                    switchCenterContent(newContent);
                     break;
                 }
                 case "annunci_lista": {
                     ListaAnnunciView listaAnnunciView = new ListaAnnunciView(controller);
                     Node newContent = listaAnnunciView.getRoot();
-                    root.getChildren().set(1, newContent);
-                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                    switchCenterContent(newContent);
                     break;
                 }
                 case "offerte_inviate": {
                     OfferteInviateView offerteInvView = new OfferteInviateView(controller);
-                    Node contentInv = offerteInvView.getRoot();
-                    root.getChildren().set(1, contentInv);
-                    HBox.setHgrow(contentInv, Priority.ALWAYS);
+                    Node newContent = offerteInvView.getRoot();
+                    switchCenterContent(newContent);
                     break;
                 }
                 case "offerte_ricevute": {
                     OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
-                    Node contentRcv = offerteRcvView.getRoot();
-                    root.getChildren().set(1, contentRcv);
-                    HBox.setHgrow(contentRcv, Priority.ALWAYS);
+                    Node newContent = offerteRcvView.getRoot();
+                    switchCenterContent(newContent);
                     break;
                 }
                 case "oggetti": {
                     OggettiView oggettiView = new OggettiView(controller);
                     Node newContent = oggettiView.getRoot();
-                    root.getChildren().set(1, newContent);
-                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                    switchCenterContent(newContent);
                     break;
                 }
                 case "statistiche": {
                     ReportView reportView = new ReportView(controller);
                     Node newContent = reportView.getRoot();
-                    root.getChildren().set(1, newContent);
-                    HBox.setHgrow(newContent, Priority.ALWAYS);
+                    switchCenterContent(newContent);
                     break;
                 }
             }
@@ -136,7 +129,7 @@ public class HomePageView {
 
         VBox heroCard = card(
                 h1("Dashboard"),
-                subtitle("Gestisci annunci, offerte e oggetti in un'unica schermata ✨")
+                subtitle("Gestisci annunci, offerte e oggetti in un'unica schermata")
         );
 
         VBox quickActions = card(
@@ -149,8 +142,7 @@ public class HomePageView {
                     ghostButton("Gestisci annunci", () -> {
                         AnnunciView annunciView = new AnnunciView(controller);
                         Node newContent = annunciView.getRoot();
-                        root.getChildren().set(1, newContent);
-                        HBox.setHgrow(newContent, Priority.ALWAYS);
+                        switchCenterContent(newContent);
                     }),
                     ghostButton("Gestisci offerte", () -> {
                         OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
@@ -237,8 +229,7 @@ public class HomePageView {
     private void openAnnunciGestisci() {
         AnnunciView annunciView = new AnnunciView(controller);
         Node newContent = annunciView.getRoot();
-        root.getChildren().set(1, newContent);
-        HBox.setHgrow(newContent, Priority.ALWAYS);
+        switchCenterContent(newContent);
     }
 
     private VBox card(Node... children) {
@@ -356,5 +347,14 @@ public class HomePageView {
 
     private void navigate(String key) {
         System.out.println("Vai a: " + key);
+    }
+    
+    private void switchCenterContent(Node nuovoContenuto) {
+        if (root.getChildren().size() > 1) {
+            root.getChildren().set(1, nuovoContenuto);
+        } else if (root.getChildren().size() == 1) {
+            root.getChildren().add(nuovoContenuto);
+        }
+        HBox.setHgrow(nuovoContenuto, Priority.ALWAYS);
     }
 }

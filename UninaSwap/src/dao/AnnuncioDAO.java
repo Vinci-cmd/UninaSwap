@@ -133,6 +133,27 @@ public class AnnuncioDAO {
         }
     }
 
+    // =========================================================
+    // == METODO AGGIUNTO PER CORREGGERE IL "COMPRA SUBITO" ===
+    // =========================================================
+    /**
+     * Aggiorna SOLO lo stato di un annuncio.
+     * Usato per marcare un annuncio come "concluso" o "scaduto" senza violare i vincoli.
+     */
+    public boolean aggiornaStatoAnnuncio(String codiceAnnuncio, String nuovoStato) throws SQLException {
+        // Usa i nomi colonna corretti (codiceannuncio, stato)
+        String sql = "UPDATE annuncio SET stato = ? WHERE codiceannuncio = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, nuovoStato);
+            ps.setString(2, codiceAnnuncio);
+            int righeModificate = ps.executeUpdate();
+            return righeModificate > 0;
+        }
+    }
+    // =========================================================
+    // =========================================================
+
+
     //Metodo per eliminare annuncio
     public boolean eliminaAnnuncio(String codice) throws SQLException {
         String sql = "DELETE FROM annuncio WHERE codiceannuncio = ?";
