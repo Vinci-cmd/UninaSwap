@@ -1,8 +1,8 @@
 package model;
 
 public class Offre {
-    private String codiceOfferta;   // riferimento a Offerta
-    private String codiceOggetto;   // riferimento a Oggetto
+    private String codiceOfferta;  
+    private String codiceOggetto; 
 
     public Offre(String codiceOfferta, String codiceOggetto) {
         this.codiceOfferta = codiceOfferta;

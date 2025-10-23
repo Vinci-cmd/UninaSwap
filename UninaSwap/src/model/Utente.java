@@ -10,7 +10,6 @@ public class Utente {
     private String password;
     private String universita;
 
-    // Costruttore
     public Utente(String matricola, String nome, String cognome, String email, String password, String universita) {
         this.matricola = matricola;
         this.nome = nome;
@@ -20,7 +19,6 @@ public class Utente {
         this.universita = universita;
     }
 
-    // Getter & Setter
     public String getMatricola() { return matricola; }
     public void setMatricola(String matricola) { this.matricola = matricola; }
 
@@ -38,8 +36,6 @@ public class Utente {
 
     public String getUniversita() { return universita; }
     public void setUniversita(String universita) { this.universita = universita; }
-
-    // Metodi utility: equals e toString
     
     @Override
     public boolean equals(Object o) {

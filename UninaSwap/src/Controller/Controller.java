@@ -671,7 +671,6 @@ public boolean compraSubito(String codiceAnnuncio) throws SQLException {
      }
 
 
-
     // =========================================================
     // == STATISTICHE
     // =========================================================

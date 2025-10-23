@@ -5,7 +5,7 @@ public class Oggetto {
     private String nome;
     private String descrizione;
     private String categoria;
-    private String codiceAnnuncio; // riferimento all'annuncio a cui appartiene
+    private String codiceAnnuncio;
     private String matricola;
 
     public Oggetto(String codiceOggetto, String nome, String descrizione, String categoria, String codiceAnnuncio) {

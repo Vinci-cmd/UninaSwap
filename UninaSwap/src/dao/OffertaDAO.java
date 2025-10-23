@@ -8,26 +8,17 @@ import model.Offerta;
 public class OffertaDAO {
     private final Connection conn;
 
-    public OffertaDAO(Connection conn) {
-        this.conn = conn;
-    }
-
-    // Creazione e Aggiornamento
+    public OffertaDAO(Connection conn) { this.conn = conn; }
 
     public boolean creaOfferta(Offerta offerta) throws SQLException {
-        String last = getLastCodiceOfferta();
-        String prefix = "OFF";
+        String last = getLastCodiceOfferta(), prefix = "OFF";
         int nextNum = 1;
         if (last != null && last.startsWith(prefix)) {
             String numPart = last.substring(prefix.length());
-            try {
-                nextNum = Integer.parseInt(numPart) + 1;
-            } catch(NumberFormatException e) {
-                throw new SQLException("Errore parsing codice offerta: " + numPart, e);
-            }
+            try { nextNum = Integer.parseInt(numPart) + 1; }
+            catch(NumberFormatException e) { throw new SQLException("Errore parsing codice offerta: " + numPart, e); }
         }
-        String newCode = String.format(prefix + "%05d", nextNum);
-        offerta.setCodiceOfferta(newCode);
+        offerta.setCodiceOfferta(String.format(prefix + "%05d", nextNum));
 
         String sql = "INSERT INTO offerta (codiceofferta, tipo, stato, data, prezzoofferto, matricola, codiceannuncio, messaggio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -35,8 +26,7 @@ public class OffertaDAO {
             ps.setString(2, offerta.getTipo());
             ps.setString(3, offerta.getStato());
             ps.setDate(4, new Date(System.currentTimeMillis()));
-            if (offerta.getPrezzoOfferto() != null) ps.setDouble(5, offerta.getPrezzoOfferto());
-            else ps.setNull(5, java.sql.Types.DOUBLE);
+            if (offerta.getPrezzoOfferto() != null) ps.setDouble(5, offerta.getPrezzoOfferto()); else ps.setNull(5, Types.DOUBLE);
             ps.setString(6, offerta.getMatricola());
             ps.setString(7, offerta.getCodiceAnnuncio());
             ps.setString(8, offerta.getMessaggio());
@@ -47,8 +37,7 @@ public class OffertaDAO {
     public boolean aggiornaOfferta(Offerta offerta) throws SQLException {
         String sql = "UPDATE offerta SET prezzoofferto = ?, tipo = ?, stato = ? WHERE codiceofferta = ? AND stato = 'inviata'";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            if (offerta.getPrezzoOfferto() != null) ps.setDouble(1, offerta.getPrezzoOfferto());
-            else ps.setNull(1, Types.NUMERIC);
+            if (offerta.getPrezzoOfferto() != null) ps.setDouble(1, offerta.getPrezzoOfferto()); else ps.setNull(1, Types.NUMERIC);
             ps.setString(2, offerta.getTipo());
             ps.setString(3, offerta.getStato());
             ps.setString(4, offerta.getCodiceOfferta());
@@ -58,13 +47,9 @@ public class OffertaDAO {
 
     public boolean eliminaOfferta(String codiceOfferta) throws SQLException {
         String sql = "DELETE FROM offerta WHERE codiceofferta = ? AND stato = 'inviata'";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, codiceOfferta);
-            return ps.executeUpdate() == 1;
-        }
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { ps.setString(1, codiceOfferta); return ps.executeUpdate() == 1; }
     }
 
-    // Metodo per evitare duplicazione codice (senza dover scrivere sempre rs.getstring e.c.c)
     private Offerta extractOfferta(ResultSet rs) throws SQLException {
         Double prezzoOfferto = null;
         Object prezzoObj = rs.getObject("prezzoofferto");
@@ -80,54 +65,41 @@ public class OffertaDAO {
         );
     }
 
-    //Ricavare un offerta dal codiceOfferta
-    
     public Offerta getOffertaByCodice(String codiceOfferta) throws SQLException {
         String sql = "SELECT * FROM offerta WHERE codiceofferta = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, codiceOfferta);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return extractOfferta(rs);
-            }
+            try (ResultSet rs = ps.executeQuery()) { if (rs.next()) return extractOfferta(rs); }
         }
         return null;
     }
-    //Ricavare un offerta posseduta da un utente 
+
     public List<Offerta> getOfferteByUtente(String matricola) throws SQLException {
         String sql = "SELECT * FROM offerta WHERE matricola = ?";
         List<Offerta> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, matricola);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) list.add(extractOfferta(rs));
-            }
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) list.add(extractOfferta(rs)); }
         }
         return list;
     }
 
-    //Ricavare le offerte inviante da un utente 
     public List<Offerta> getOfferteInviateByUtente(String matricola) throws SQLException {
         String sql = "SELECT * FROM offerta WHERE matricola = ? ORDER BY data DESC";
         List<Offerta> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, matricola);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) list.add(extractOfferta(rs));
-            }
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) list.add(extractOfferta(rs)); }
         }
         return list;
     }
 
-    
-   //Ricava le offerte collegate ad un annuncio
     public List<Offerta> getOfferteByAnnuncio(String codiceAnnuncio) throws SQLException {
         String sql = "SELECT * FROM offerta WHERE codiceannuncio = ?";
         List<Offerta> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, codiceAnnuncio);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) list.add(extractOfferta(rs));
-            }
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) list.add(extractOfferta(rs)); }
         }
         return list;
     }
@@ -136,35 +108,21 @@ public class OffertaDAO {
         return getOfferteByAnnuncio(codiceAnnuncio);
     }
 
-    
-    //Ricava le offerte ricevute di un utente
     public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
-        String sql = "SELECT o.* FROM offerta o " +
-                     "JOIN annuncio a ON o.codiceannuncio = a.codiceannuncio " +
-                     "WHERE a.matricola = ? ORDER BY o.data DESC";
+        String sql = "SELECT o.* FROM offerta o JOIN annuncio a ON o.codiceannuncio = a.codiceannuncio WHERE a.matricola = ? ORDER BY o.data DESC";
         List<Offerta> offerte = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, matricola);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) offerte.add(extractOfferta(rs));
-            }
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) offerte.add(extractOfferta(rs)); }
         }
         return offerte;
     }
 
-    
-    //Metodo per aggiungere un oggetto ad uno scambio
-    
     public boolean aggiungiOggettoAScambio(String codiceOfferta, String codiceOggetto) throws SQLException {
         String sql = "INSERT INTO offre (codiceofferta, codiceoggetto) VALUES (?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, codiceOfferta);
-            ps.setString(2, codiceOggetto);
-            return ps.executeUpdate() == 1;
-        }
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { ps.setString(1, codiceOfferta); ps.setString(2, codiceOggetto); return ps.executeUpdate() == 1; }
     }
 
-    //Metodo per inviare un offerta
     public boolean inviaOfferta(Offerta offerta) throws SQLException {
         String sql = "INSERT INTO offerta (codiceofferta, codiceannuncio, matricola, tipo, prezzoofferto, stato, data) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -172,17 +130,13 @@ public class OffertaDAO {
             stmt.setString(2, offerta.getCodiceAnnuncio());
             stmt.setString(3, offerta.getMatricola());
             stmt.setString(4, offerta.getTipo());
-            if (offerta.getPrezzoOfferto() != null) stmt.setDouble(5, offerta.getPrezzoOfferto());
-            else stmt.setNull(5, java.sql.Types.NUMERIC);
+            if (offerta.getPrezzoOfferto() != null) stmt.setDouble(5, offerta.getPrezzoOfferto()); else stmt.setNull(5, Types.NUMERIC);
             stmt.setString(6, offerta.getStato());
             stmt.setDate(7, offerta.getData());
             return stmt.executeUpdate() > 0;
         }
     }
 
-    
-    //Metodo per inviare un offerta scambio
-    
     public boolean inviaOffertaConOggetti(Offerta offerta, List<String> codiciOggetti) throws SQLException {
         conn.setAutoCommit(false);
         try {
@@ -206,79 +160,47 @@ public class OffertaDAO {
         }
     }
 
-    //Metodi per la pagina delle statistiche
-
     public int getTotaleOfferte() throws SQLException {
         String sql = "SELECT COUNT(*) AS totale FROM offerta";
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) return rs.getInt("totale");
-        }
-        return 0;
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) { return rs.next() ? rs.getInt("totale") : 0; }
     }
 
     public int getTotaleOffertePerTipologia(String tipologia) throws SQLException {
         String sql = "SELECT COUNT(*) AS totale FROM offerta WHERE tipo = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, tipologia);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("totale");
-            }
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt("totale") : 0; }
         }
-        return 0;
     }
 
     public int getOfferteAccettatePerTipologia(String tipologia) throws SQLException {
         String sql = "SELECT COUNT(*) AS totale FROM offerta WHERE tipo = ? AND stato = 'accettata'";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, tipologia);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("totale");
-            }
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt("totale") : 0; }
         }
-        return 0;
     }
 
     public double[] getStatisticheVenditeAccettate() throws SQLException {
-        String sql = "SELECT MIN(prezzoofferto) AS minPrezzo, MAX(prezzoofferto) AS maxPrezzo, AVG(prezzoofferto) AS avgPrezzo " +
-                     "FROM offerta WHERE tipo = 'vendita' AND stato = 'accettata'";
+        String sql = "SELECT MIN(prezzoofferto) AS minPrezzo, MAX(prezzoofferto) AS maxPrezzo, AVG(prezzoofferto) AS avgPrezzo FROM offerta WHERE tipo = 'vendita' AND stato = 'accettata'";
         try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-            if (rs.next()) {
-                return new double[] {
-                    rs.getDouble("minPrezzo"),
-                    rs.getDouble("maxPrezzo"),
-                    rs.getDouble("avgPrezzo")
-                };
-            }
+            if (rs.next()) return new double[] { rs.getDouble("minPrezzo"), rs.getDouble("maxPrezzo"), rs.getDouble("avgPrezzo") };
         }
         return new double[] {0, 0, 0};
     }
 
-    // Metodi per gli stati delle offerte
-
     public boolean accettaOfferta(String codiceOfferta) throws SQLException {
         String sql = "UPDATE offerta SET stato = 'accettata' WHERE codiceofferta = ? AND stato = 'inviata'";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, codiceOfferta);
-            return ps.executeUpdate() == 1;
-        }
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { ps.setString(1, codiceOfferta); return ps.executeUpdate() == 1; }
     }
 
     public boolean rifiutaOfferta(String codiceOfferta) throws SQLException {
         String sql = "UPDATE offerta SET stato = 'rifiutata' WHERE codiceofferta = ? AND stato = 'inviata'";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, codiceOfferta);
-            return ps.executeUpdate() == 1;
-        }
+        try (PreparedStatement ps = conn.prepareStatement(sql)) { ps.setString(1, codiceOfferta); return ps.executeUpdate() == 1; }
     }
 
-    //Recupera l'ultimo codice Offerta
     public String getLastCodiceOfferta() throws SQLException {
         String sql = "SELECT MAX(codiceofferta) AS maxcode FROM offerta WHERE codiceofferta LIKE 'OFF%'";
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) return rs.getString("maxcode");
-        }
-        return null;
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getString("maxcode") : null; }
     }
 }

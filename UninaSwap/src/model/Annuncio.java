@@ -6,11 +6,11 @@ public class Annuncio {
     private String codiceAnnuncio;
     private String descrizione;
     private String categoria;
-    private String tipologia; // vendita, scambio, regalo
+    private String tipologia;
     private Double prezzo;
     private String stato;
     private Date dataPubblicazione;
-    private String matricola; // riferimento a Utente
+    private String matricola;
 
     public Annuncio(String codiceAnnuncio, String descrizione, String categoria, String tipologia,
                     Double prezzo, String stato, Date dataPubblicazione, String matricola) {

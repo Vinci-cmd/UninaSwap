@@ -13,7 +13,6 @@ public class Offerta {
     private String messaggio;
     private String descrizioneAnnuncio;
 
-    // Costruttore 
     public Offerta(String codiceOfferta, String codiceAnnuncio, String matricola, String tipo,
                    Double prezzoOfferto, String stato, Date data) {
         this.codiceOfferta = codiceOfferta;
@@ -24,9 +23,9 @@ public class Offerta {
         this.stato = stato;
         this.data = data;
     }
-    // Costruttore Vuoto
     public Offerta() {}
-    // Getter & Setter
+    
+    
     public String getCodiceOfferta() { return codiceOfferta; }
     public void setCodiceOfferta(String codiceOfferta) { this.codiceOfferta = codiceOfferta; }
 
