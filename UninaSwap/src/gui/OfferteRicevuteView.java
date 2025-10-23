@@ -86,9 +86,9 @@ public class OfferteRicevuteView {
         cbStato.setOnAction(e -> applyFilters());
 
         tfSearch = styledTextField("Cerca per codice annuncio/mittente...");
+        searchDebounce.setOnFinished(ev -> applyFilters());
         tfSearch.textProperty().addListener((obs, o, n) -> {
             searchDebounce.stop();
-            searchDebounce.setOnFinished(ev -> applyFilters());
             searchDebounce.playFromStart();
         });
 
@@ -132,19 +132,16 @@ public class OfferteRicevuteView {
         colTipo.setCellValueFactory(new PropertyValueFactory<>("tipo"));
         colTipo.setPrefWidth(100);
 
-        // ================== NUOVA COLONNA PREZZO ==================
         TableColumn<Offerta, String> colPrezzo = new TableColumn<>("Prezzo Offerto");
         colPrezzo.setCellValueFactory(cd -> {
             Offerta o = cd.getValue();
-            String textToShow = "—"; // Default: dash
+            String textToShow = "—";
             if (o != null && "vendita".equals(o.getTipo()) && o.getPrezzoOfferto() != null) {
-                // Formatta come valuta (es. € 10,50)
                 textToShow = String.format(java.util.Locale.ITALY, "€ %.2f", o.getPrezzoOfferto());
             }
             return new javafx.beans.property.SimpleStringProperty(textToShow);
         });
         colPrezzo.setPrefWidth(120);
-        // Aggiungiamo una CellFactory per allineare il testo
         colPrezzo.setCellFactory(col -> new TableCell<Offerta, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -153,7 +150,6 @@ public class OfferteRicevuteView {
                     setText(null);
                 } else {
                     setText(item);
-                    // Allinea a destra se è un prezzo, altrimenti centra
                     if (item.startsWith("€")) {
                         setAlignment(Pos.CENTER_RIGHT);
                     } else {
@@ -162,7 +158,6 @@ public class OfferteRicevuteView {
                 }
             }
         });
-        // ================== FINE NUOVA COLONNA ==================
 
         TableColumn<Offerta, String> colStato = new TableColumn<>("Stato");
         colStato.setCellValueFactory(new PropertyValueFactory<>("stato"));
@@ -191,16 +186,20 @@ public class OfferteRicevuteView {
             @Override
             public void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || getIndex() < 0 || getIndex() >= getTableView().getItems().size() || !"inviata".equals(getTableView().getItems().get(getIndex()).getStato())) {
+                if (empty) {
                     setGraphic(null);
                 } else {
-                    setGraphic(box);
+                    Offerta offerta = getTableView().getItems().get(getIndex());
+                    if (offerta != null && "inviata".equals(offerta.getStato())) {
+                        setGraphic(box);
+                    } else {
+                        setGraphic(null);
+                    }
                 }
             }
         });
         colAzioni.setPrefWidth(150);
 
-        // Aggiunta la colonna 'colPrezzo' alla tabella
         tableOfferte.getColumns().addAll(colCodice, colAnnuncio, colMittente, colTipo, colPrezzo, colStato, colData, colAzioni);
         tableOfferte.setPrefHeight(440);
 
@@ -346,7 +345,6 @@ public class OfferteRicevuteView {
         
         if ("vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() != null) {
             grid.add(l("Prezzo offerto:"), 0, r);
-            // Uso Locale.ITALY per coerenza con la tabella
             grid.add(valueLabel.apply("€" + String.format(java.util.Locale.ITALY, "%.2f", offerta.getPrezzoOfferto())), 1, r++);
         }
         
@@ -400,7 +398,7 @@ public class OfferteRicevuteView {
         ta.setStyle("-fx-background-color: rgba(255,255,255,0.10); -fx-control-inner-background: rgba(16,20,30,0.35); -fx-text-fill: #EAF0FF; -fx-background-radius: 12; -fx-border-radius: 12; -fx-padding: 10 12; -fx-prompt-text-fill: rgba(234,240,255,0.45); -fx-border-color: transparent;");
     }
     
-    private void styleCombo(ComboBox<String> cb) {
+    private <T> void styleCombo(ComboBox<T> cb) {
         cb.setStyle("-fx-background-color: rgba(255,255,255,0.10); -fx-text-fill: #EAF0FF; -fx-background-radius: 12; -fx-padding: 2 4; -fx-border-color: transparent;");
         cb.setOnShowing(e -> Platform.runLater(() -> {
             Node popup = cb.lookup(".combo-box-popup");
@@ -451,9 +449,11 @@ public class OfferteRicevuteView {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
         final String baseStyle = "-fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700; -fx-text-fill: white;";
-        b.setStyle("-fx-background-color: #4f8cff;" + baseStyle);
-        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: #3b6fe0;" + baseStyle));
-        b.setOnMouseExited(e -> b.setStyle("-fx-background-color: #4f8cff;" + baseStyle));
+        final String normalStyle = "-fx-background-color: #4f8cff;" + baseStyle;
+        final String hoverStyle = "-fx-background-color: #3b6fe0;" + baseStyle;
+        b.setStyle(normalStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+        b.setOnMouseExited(e -> b.setStyle(normalStyle));
         return b;
     }
 
@@ -461,9 +461,11 @@ public class OfferteRicevuteView {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
         final String baseStyle = "-fx-text-fill: #EAF0FF; -fx-border-color: rgba(255,255,255,0.20); -fx-border-radius: 12; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;";
-        b.setStyle("-fx-background-color: transparent;" + baseStyle);
-        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: rgba(255,255,255,0.08);" + baseStyle));
-        b.setOnMouseExited(e -> b.setStyle("-fx-background-color: transparent;" + baseStyle));
+        final String normalStyle = "-fx-background-color: transparent;" + baseStyle;
+        final String hoverStyle = "-fx-background-color: rgba(255,255,255,0.08);" + baseStyle;
+        b.setStyle(normalStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+        b.setOnMouseExited(e -> b.setStyle(normalStyle));
         return b;
     }
     

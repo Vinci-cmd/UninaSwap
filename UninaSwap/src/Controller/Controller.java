@@ -370,38 +370,64 @@ return annuncioDAO.aggiornaAnnuncio(aggiornato);
 
     /**
      * Invia offerta con controllo logica di business.
+     * --- ORA TRANSAZIONALE PER EVITARE RACE CONDITION ---
      */
     public boolean inviaOfferta(Offerta offerta, List<String> codiciOggetti) throws SQLException {
-        Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(offerta.getCodiceAnnuncio());
-        if (annuncio == null) throw new SQLException("Annuncio non trovato");
-        if (annuncio.getMatricola().equals(offerta.getMatricola()))
-            throw new SQLException("Non puoi inviare offerte ai tuoi stessi annunci");
-        if (!"attivo".equals(annuncio.getStato()))
-            throw new SQLException("Non è possibile inviare offerte su annunci non attivi");
-        if (!offerta.getTipo().equals(annuncio.getTipologia()))
-            throw new SQLException("La tipologia dell'offerta deve coincidere con quella dell'annuncio");
-        if ("vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() == null)
-            throw new SQLException("Una offerta di vendita deve avere prezzoOfferto valorizzato");
-        if (!"vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() != null)
-            throw new SQLException("Solo le offerte di tipo vendita possono avere prezzoOfferto valorizzato");
+        
+        boolean autoCommitOriginale = false;
+        try {
+            // --- INIZIO TRANSAZIONE ---
+            autoCommitOriginale = conn.getAutoCommit();
+            conn.setAutoCommit(false); 
 
-        boolean inserita = offertaDAO.creaOfferta(offerta);
-        if (!inserita) throw new SQLException("Errore durante l'inserimento dell'offerta");
+            // 1. CONTROLLO (all'interno della transazione)
+            Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(offerta.getCodiceAnnuncio());
+            if (annuncio == null) throw new SQLException("Annuncio non trovato");
+            if (annuncio.getMatricola().equals(offerta.getMatricola()))
+                throw new SQLException("Non puoi inviare offerte ai tuoi stessi annunci");
+            
+            // Questo è il controllo che ora è protetto dalla transazione
+            if (!"attivo".equals(annuncio.getStato()))
+                throw new SQLException("Non è possibile inviare offerte su annunci non attivi");
+            
+            if (!offerta.getTipo().equals(annuncio.getTipologia()))
+                throw new SQLException("La tipologia dell'offerta deve coincidere con quella dell'annuncio");
+            if ("vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() == null)
+                throw new SQLException("Una offerta di vendita deve avere prezzoOfferto valorizzato");
+            if (!"vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() != null)
+                throw new SQLException("Solo le offerte di tipo vendita possono avere prezzoOfferto valorizzato");
 
-        if ("scambio".equals(offerta.getTipo()) && codiciOggetti != null) {
-            for (String codiceOggetto : codiciOggetti) {
-                Oggetto oggetto = oggettoDAO.getOggettoByCodice(codiceOggetto);
-                if (oggetto == null) throw new SQLException("Oggetto " + codiceOggetto + " non trovato");
-                // Assicura che l'offerta abbia un codice prima di creare l'associazione
-                if (offerta.getCodiceOfferta() == null) {
-                     // Potrebbe essere necessario recuperare l'offerta appena creata se il DAO non la popola
-                     throw new SQLException("Codice offerta mancante per associazione oggetto.");
+            // 2. INSERIMENTO (all'interno della transazione)
+            boolean inserita = offertaDAO.creaOfferta(offerta);
+            if (!inserita) throw new SQLException("Errore durante l'inserimento dell'offerta");
+
+            // 3. GESTIONE OGGETTI (all'interno della transazione)
+            if ("scambio".equals(offerta.getTipo()) && codiciOggetti != null) {
+                for (String codiceOggetto : codiciOggetti) {
+                    Oggetto oggetto = oggettoDAO.getOggettoByCodice(codiceOggetto);
+                    if (oggetto == null) throw new SQLException("Oggetto " + codiceOggetto + " non trovato");
+                    // Assicura che l'offerta abbia un codice prima di creare l'associazione
+                    if (offerta.getCodiceOfferta() == null) {
+                        // Potrebbe essere necessario recuperare l'offerta appena creata se il DAO non la popola
+                        throw new SQLException("Codice offerta mancante per associazione oggetto.");
+                    }
+                    offreDAO.aggiungiOggettoAScambio(offerta.getCodiceOfferta(), codiceOggetto);
                 }
-                offreDAO.aggiungiOggettoAScambio(offerta.getCodiceOfferta(), codiceOggetto);
             }
-        }
 
-        return true;
+            // --- FINE TRANSAZIONE ---
+            conn.commit();
+            return true;
+
+        } catch (SQLException e) {
+            // Se qualcosa va storto, annulla tutto
+            try { conn.rollback(); } catch (SQLException ex) { showError("Errore rollback: " + ex.getMessage()); }
+            // Rilancia l'eccezione con il messaggio di errore (es. "Non è possibile inviare...")
+            throw e; 
+        } finally {
+            // Ripristina l'autocommit
+            try { conn.setAutoCommit(autoCommitOriginale); } catch (SQLException ex) { showError("Errore ripristino autocommit: " + ex.getMessage()); }
+        }
     }
 
     /**
@@ -433,8 +459,10 @@ return annuncioDAO.aggiornaAnnuncio(aggiornato);
         offerta.setMessaggio(messaggio);
         offerta.setCodiceOfferta(UUID.randomUUID().toString());
         offerta.setData(new Date(System.currentTimeMillis()));
-        // Usiamo creaOfferta direttamente perché non ci sono oggetti da gestire
-        return offertaDAO.creaOfferta(offerta);
+        
+        // CORREZIONE: Chiamiamo il metodo principale che ha la validazione
+        // (passando null per la lista oggetti, visto che non ci sono)
+        return inviaOfferta(offerta, null);
     }
 
     /**
@@ -704,10 +732,6 @@ public boolean compraSubito(String codiceAnnuncio) throws SQLException {
 
 
     // =========================================================
-    // == TIPI CONSEGNA
-    // =========================================================
-
-    // =========================================================
     // == STATISTICHE
     // =========================================================
 
@@ -828,4 +852,3 @@ public boolean compraSubito(String codiceAnnuncio) throws SQLException {
         return null;
     }
 }
-

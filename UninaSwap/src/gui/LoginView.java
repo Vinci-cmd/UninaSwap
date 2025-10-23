@@ -14,12 +14,12 @@ import javafx.stage.Stage;
 public class LoginView {
     private VBox root;
     private final Controller controller;
-    private final Stage stage; // Stage sempre presente!
+    private final Stage stage;
 
     // --- LOGIN ---
     private TextField emailField;
     private PasswordField passwordField;
-    private TextField passwordMirror; // per "Mostra password"
+    private TextField passwordMirror;
     private CheckBox showPass;
     private Button loginButton;
     private Label loginMessageLabel;
@@ -39,7 +39,7 @@ public class LoginView {
 
     public LoginView(Stage stage, Controller controller) {
         this.controller = controller;
-        this.stage = stage; // Stage salvato!
+        this.stage = stage;
         createShell();
         showLoginView();
     }
@@ -238,8 +238,8 @@ public class LoginView {
     private void tryLogin() {
         String email = safeTrim(emailField.getText());
         String password = showPass.isSelected()
-                ? safeTrim(passwordMirror.getText())
-                : safeTrim(passwordField.getText());
+            ? safeTrim(passwordMirror.getText())
+            : safeTrim(passwordField.getText());
 
         if (email.isEmpty() || password.isEmpty()) {
             showLoginError("Inserisci email e password.");
@@ -265,7 +265,7 @@ public class LoginView {
         String universita = safeTrim(universitaField.getText());
 
         if (nome.isEmpty() || cognome.isEmpty() || matricola.isEmpty()
-                || email.isEmpty() || pass.isEmpty() || pass2.isEmpty() || universita.isEmpty()) {
+            || email.isEmpty() || pass.isEmpty() || pass2.isEmpty() || universita.isEmpty()) {
             showRegisterError("Compila tutti i campi.");
             return;
         }
@@ -299,13 +299,12 @@ public class LoginView {
 
     private void goHome() {
         HomePageView homepage = new HomePageView(stage, controller);
-        // Usa le dimensioni attuali dello stage
         double w = stage.getWidth();
         double h = stage.getHeight();
         Scene homeScene = new Scene(homepage.getRoot(), w, h);
         stage.setScene(homeScene);
         stage.setTitle("UninaSwap - Dashboard");
-        stage.setMaximized(true); // Così resta o ritorna massimizzata
+        stage.setMaximized(true);
     }
 
 
@@ -350,49 +349,43 @@ public class LoginView {
     }
 
     private void stylePrimary(Button b) {
-        b.setStyle(
-            "-fx-background-color: #4f8cff;" +
+        final String baseStyle = "-fx-background-color: #4f8cff;" +
             "-fx-text-fill: white;" +
             "-fx-background-radius: 12;" +
             "-fx-padding: 10 16;" +
-            "-fx-font-weight: 700;"
-        );
-        b.setOnMouseEntered(e -> b.setStyle(
-            "-fx-background-color: #3b6fe0; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
-        ));
-        b.setOnMouseExited(e -> b.setStyle(
-            "-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
-        ));
+            "-fx-font-weight: 700;";
+        
+        final String hoverStyle = "-fx-background-color: #3b6fe0;" +
+            "-fx-text-fill: white;" +
+            "-fx-background-radius: 12;" +
+            "-fx-padding: 10 16;" +
+            "-fx-font-weight: 700;";
+
+        b.setStyle(baseStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+        b.setOnMouseExited(e -> b.setStyle(baseStyle));
     }
 
     private void styleGhost(Button b) {
-        b.setStyle(
-            "-fx-background-color: transparent;" +
+        final String baseStyle = "-fx-background-color: transparent;" +
             "-fx-text-fill: #EAF0FF;" +
             "-fx-border-color: rgba(255,255,255,0.20);" +
             "-fx-border-radius: 12;" +
             "-fx-background-radius: 12;" +
             "-fx-padding: 10 16;" +
-            "-fx-font-weight: 700;"
-        );
-        b.setOnMouseEntered(e -> b.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.08);" +
+            "-fx-font-weight: 700;";
+        
+        final String hoverStyle = "-fx-background-color: rgba(255,255,255,0.08);" +
             "-fx-text-fill: #EAF0FF;" +
             "-fx-border-color: rgba(255,255,255,0.20);" +
             "-fx-border-radius: 12;" +
             "-fx-background-radius: 12;" +
             "-fx-padding: 10 16;" +
-            "-fx-font-weight: 700;"
-        ));
-        b.setOnMouseExited(e -> b.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-border-color: rgba(255,255,255,0.20);" +
-            "-fx-border-radius: 12;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 16;" +
-            "-fx-font-weight: 700;"
-        ));
+            "-fx-font-weight: 700;";
+
+        b.setStyle(baseStyle);
+        b.setOnMouseEntered(e -> b.setStyle(hoverStyle));
+        b.setOnMouseExited(e -> b.setStyle(baseStyle));
     }
 
     private void togglePasswordFields(boolean showPlain) {

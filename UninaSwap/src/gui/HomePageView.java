@@ -18,13 +18,10 @@ import java.sql.SQLException;
 public class HomePageView {
     private HBox root;
     private final Controller controller;
-    private final Stage stage; // aggiunto per il logout
-    private VBox tableCard;
-
+    private final Stage stage;
     private SideMenuView sideMenu;
 
     public HomePageView(Stage stage, Controller controller) {
-    	
         this.controller = controller;
         this.stage = stage;
         createUI();
@@ -101,8 +98,8 @@ public class HomePageView {
         header.setPadding(new Insets(6, 6, 16, 6));
 
         String nome = (controller.getUtenteCorrente() != null && controller.getUtenteCorrente().getNome() != null)
-                ? controller.getUtenteCorrente().getNome()
-                : "Utente";
+            ? controller.getUtenteCorrente().getNome()
+            : "Utente";
 
         Label brand = new Label("UninaSwap");
         brand.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 20px; -fx-font-weight: 900;");
@@ -113,12 +110,11 @@ public class HomePageView {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button logout = ghostButton("Logout", () -> {
-            controller.logout(); // azzera sessione utente se serve
+            controller.logout();
             LoginView loginView = new LoginView(stage, controller);
-            Scene loginScene = new Scene(loginView.getRoot(), stage.getWidth(), stage.getHeight()); // Mantieni altezza/larghezza attuali!
+            Scene loginScene = new Scene(loginView.getRoot(), stage.getWidth(), stage.getHeight());
             stage.setScene(loginScene);
             stage.setTitle("UninaSwap - Login");
-            // Se vuoi anche massimizzare dopo il logout, aggiungi questa riga:
             stage.setMaximized(true);
         });
 
@@ -132,29 +128,27 @@ public class HomePageView {
         heroRow.setAlignment(Pos.CENTER_LEFT);
 
         VBox heroCard = card(
-                h1("Dashboard"),
-                subtitle("Gestisci annunci, offerte e oggetti in un'unica schermata")
+            h1("Dashboard"),
+            subtitle("Gestisci annunci, offerte e oggetti in un'unica schermata")
         );
 
         VBox quickActions = card(
-                title("Azioni rapide"),
-                row(
-                    primaryButton("Crea annuncio", () -> {
-                        AnnunciView annunciView = new AnnunciView(controller);
-                        annunciView.mostraCreaAnnuncioDialog(); // <--- chiama direttamente la creazione annuncio
-                    }),
-                    ghostButton("Gestisci annunci", () -> {
-                        AnnunciView annunciView = new AnnunciView(controller);
-                        Node newContent = annunciView.getRoot();
-                        switchCenterContent(newContent);
-                    }),
-                    ghostButton("Gestisci offerte", () -> {
-                        OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
-                        Node contentRcv = offerteRcvView.getRoot();
-                        root.getChildren().set(1, contentRcv);
-                        HBox.setHgrow(contentRcv, Priority.ALWAYS);
-                    })
-                )
+            title("Azioni rapide"),
+            row(
+                primaryButton("Crea annuncio", () -> {
+                    AnnunciView annunciView = new AnnunciView(controller);
+                    annunciView.mostraCreaAnnuncioDialog();
+                }),
+                ghostButton("Gestisci annunci", () -> {
+                    AnnunciView annunciView = new AnnunciView(controller);
+                    Node newContent = annunciView.getRoot();
+                    switchCenterContent(newContent);
+                }),
+                ghostButton("Gestisci offerte", () -> {
+                    OfferteRicevuteView offerteRcvView = new OfferteRicevuteView(controller);
+                    switchCenterContent(offerteRcvView.getRoot());
+                })
+            )
         );
 
         HBox.setHgrow(heroCard, Priority.ALWAYS);
@@ -181,20 +175,18 @@ public class HomePageView {
         
         
         notifList.setStyle(
-        	    "-fx-background-color: transparent;" +
-        	    "-fx-control-inner-background: #24273A;" + // sfondo più scuro
-        	    "-fx-background-insets: 0;" +
-        	    "-fx-text-fill: #f8f8fc;" +
-        	    "-fx-font-size: 14px;" + 
-        	    "-fx-font-weight: 500;"
-        	);
-
-
+            "-fx-background-color: transparent;" +
+            "-fx-control-inner-background: #24273A;" +
+            "-fx-background-insets: 0;" +
+            "-fx-text-fill: #f8f8fc;" +
+            "-fx-font-size: 14px;" +    
+            "-fx-font-weight: 500;"
+        );
 
         VBox notifCard = card(
-                title("Notifiche recenti"),
-                subtitle("Le ultime attività del tuo account"),
-                notifList
+            title("Notifiche recenti"),
+            subtitle("Le ultime attività del tuo account"),
+            notifList
         );
 
         HBox statsRow = new HBox(16);
@@ -212,28 +204,22 @@ public class HomePageView {
         }
 
         statsRow.getChildren().addAll(
-                statBox("Annunci", String.valueOf(totAnnunci)),
-                statBox("Offerte", String.valueOf(totOfferte)),
-                statBox("Oggetti", String.valueOf(totOggetti)),
-                statBox("Annunci Personali", String.valueOf(totAnnunciPersonali))
+            statBox("Annunci", String.valueOf(totAnnunci)),
+            statBox("Offerte", String.valueOf(totOfferte)),
+            statBox("Oggetti", String.valueOf(totOggetti)),
+            statBox("Annunci Personali", String.valueOf(totAnnunciPersonali))
         );
 
         VBox statsCard = card(
-                title("Statistiche rapide"),
-                subtitle("Panoramica del tuo profilo"),
-                statsRow
+            title("Statistiche rapide"),
+            subtitle("Panoramica del tuo profilo"),
+            statsRow
         );
 
         center.getChildren().addAll(heroRow, notifCard, statsCard);
         content.setCenter(center);
 
         return content;
-    }
-
-    private void openAnnunciGestisci() {
-        AnnunciView annunciView = new AnnunciView(controller);
-        Node newContent = annunciView.getRoot();
-        switchCenterContent(newContent);
     }
 
     private VBox card(Node... children) {
@@ -277,50 +263,20 @@ public class HomePageView {
     private Button primaryButton(String text, Runnable action) {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
-        b.setStyle(
-            "-fx-background-color: #4f8cff;" +
-            "-fx-text-fill: white;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 16;" +
-            "-fx-font-weight: 700;"
-        );
-        b.setOnMouseEntered(e -> b.setStyle(
-            "-fx-background-color: #3b6fe0; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
-        ));
-        b.setOnMouseExited(e -> b.setStyle(
-            "-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;"
-        ));
+        final String baseStyle = "-fx-text-fill: white; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;";
+        b.setStyle("-fx-background-color: #4f8cff;" + baseStyle);
+        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: #3b6fe0;" + baseStyle));
+        b.setOnMouseExited(e -> b.setStyle("-fx-background-color: #4f8cff;" + baseStyle));
         return b;
     }
 
     private Button ghostButton(String text, Runnable action) {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
-        b.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-border-color: rgba(255,255,255,0.20);" +
-            "-fx-border-radius: 12;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 16;" +
-            "-fx-font-weight: 700;"
-        );
-        b.setOnMouseEntered(e -> b.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.08);" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-border-color: rgba(255,255,255,0.20);" +
-            "-fx-border-radius: 12;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 16; -fx-font-weight: 700;"
-        ));
-        b.setOnMouseExited(e -> b.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #EAF0FF;" +
-            "-fx-border-color: rgba(255,255,255,0.20);" +
-            "-fx-border-radius: 12;" +
-            "-fx-background-radius: 12;" +
-            "-fx-padding: 10 16; -fx-font-weight: 700;"
-        ));
+        final String baseStyle = "-fx-text-fill: #EAF0FF; -fx-border-color: rgba(255,255,255,0.20); -fx-border-radius: 12; -fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700;";
+        b.setStyle("-fx-background-color: transparent;" + baseStyle);
+        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color: rgba(255,255,255,0.08);" + baseStyle));
+        b.setOnMouseExited(e -> b.setStyle("-fx-background-color: transparent;" + baseStyle));
         return b;
     }
 
@@ -347,10 +303,6 @@ public class HomePageView {
 
     public HBox getRoot() {
         return root;
-    }
-
-    private void navigate(String key) {
-        System.out.println("Vai a: " + key);
     }
     
     private void switchCenterContent(Node nuovoContenuto) {

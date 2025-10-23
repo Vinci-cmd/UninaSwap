@@ -23,13 +23,9 @@ import javafx.util.Duration;
 import model.*;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.TreeSet;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 public class ListaAnnunciView {
 
@@ -71,7 +67,7 @@ public class ListaAnnunciView {
         Label title = new Label("Annunci disponibili");
         title.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 20px; -fx-font-weight: 900;");
         Label subtitle = new Label("Cerca opportunità di scambio o acquisto tra studenti.");
-        subtitle.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 13px; -fx-font-weight: 600;"); // Colore corretto
+        subtitle.setStyle("-fx-text-fill: #EAF0FF; -fx-font-size: 13px; -fx-font-weight: 600;");
         VBox header = new VBox(title, subtitle);
         header.setAlignment(Pos.CENTER_LEFT);
 
@@ -92,17 +88,17 @@ public class ListaAnnunciView {
         styleCombo(cbCategoria);
         cbCategoria.setOnAction(e -> applyFilters());
 
+        searchDebounce.setOnFinished(ev -> applyFilters());
+
         tfPrezzoMax = styledTextField("Prezzo max");
         tfPrezzoMax.textProperty().addListener((obs, o, n) -> {
             searchDebounce.stop();
-            searchDebounce.setOnFinished(ev -> applyFilters());
             searchDebounce.playFromStart();
         });
 
         txtSearch = styledTextField("Cerca per testo o codice…");
         txtSearch.textProperty().addListener((obs, o, n) -> {
             searchDebounce.stop();
-            searchDebounce.setOnFinished(ev -> applyFilters());
             searchDebounce.playFromStart();
         });
 
@@ -236,17 +232,16 @@ public class ListaAnnunciView {
         try {
             String matricolaUtente = controller.getUtenteCorrente().getMatricola();
             masterData.setAll(controller.getAnnunciAttiviRaw().stream()
-                // Filtra solo annunci "attivi" E non miei
                 .filter(a -> "attivo".equalsIgnoreCase(a.getStato()) && 
                              !a.getMatricola().equals(matricolaUtente))
-                .collect(Collectors.toList()));
+                .toList());
 
             categorie = masterData.stream()
                 .map(Annuncio::getCategoria)
                 .filter(c -> c != null && !c.isBlank())
                 .distinct()
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
             
             cbCategoria.getItems().setAll(categorie);
             cbCategoria.setPromptText("Tutte le categorie");
@@ -273,8 +268,6 @@ public class ListaAnnunciView {
 
         filtered.setPredicate(a -> {
             if (a == null) return false;
-            // Aggiunto filtro per stato, non si sa mai (anche se reloadData lo fa già)
-            if (!"attivo".equalsIgnoreCase(a.getStato())) return false; 
 
             if (tip != null && !"Tutte le tipologie".equals(tip)) {
                 if (!tip.equalsIgnoreCase(a.getTipologia())) return false;
@@ -369,9 +362,6 @@ public class ListaAnnunciView {
                 prezzoRichiesto.setStyle("-fx-text-fill: #7af7c3; -fx-font-size: 14px; -fx-font-weight: 800;");
                 TextField tfPrezzo = styledTextField("Prezzo offerto");
 
-                // --- MODIFICHE QUI ---
-                
-                // Pulsante 1: Per fare un'offerta (prezzo custom)
                 Button confermaOfferta = primaryButton("Fai un'offerta", () -> {
                     try {
                         if (tfPrezzo.getText().isBlank()) {
@@ -400,7 +390,6 @@ public class ListaAnnunciView {
                     }
                 });
 
-                // Pulsante 2: Per il Compra Subito (logica aggiornata)
                 Button compraSubito = successButton("Compra Subito", () -> {
                     double prezzoPieno = annuncio.getPrezzo();
                     
@@ -412,13 +401,11 @@ public class ListaAnnunciView {
                     Optional<ButtonType> result = alert.showAndWait();
                     if (result.isPresent() && result.get() == ButtonType.OK) {
                         try {
-                            // --- CHIAMATA ALLA NUOVA LOGICA DEL CONTROLLER ---
                             if (controller.compraSubito(annuncio.getCodiceAnnuncio())) {
                                 dialog.close();
                                 warn("Acquisto completato con successo!");
-                                reloadData(); // <-- Aggiorna la tabella per rimuovere l'annuncio
+                                reloadData();
                             } else {
-                                // Questo 'else' è per sicurezza, ma gli errori dovrebbero lanciare eccezioni
                                 warn("Errore: Impossibile completare l'acquisto.");
                             }
                         } catch (Exception ex) {
@@ -426,7 +413,6 @@ public class ListaAnnunciView {
                         }
                     }
                 });
-                // --- FINE MODIFICHE ---
 
                 HBox btns = new HBox(10, ghostButton("Annulla", dialog::close), confermaOfferta, compraSubito);
                 btns.setAlignment(Pos.CENTER_RIGHT);
@@ -457,8 +443,8 @@ public class ListaAnnunciView {
                 try {
                     List<Oggetto> oggettiPersonali = controller.getOggettiUtenteObj(controller.getUtenteCorrente().getMatricola())
                         .stream()
-                        .filter(o -> o.getCodiceAnnuncio() == null) // Filtra oggetti non già impegnati
-                        .collect(Collectors.toList());
+                        .filter(o -> o.getCodiceAnnuncio() == null)
+                        .toList();
                     if (oggettiPersonali.isEmpty()) {
                         warn("Non hai oggetti disponibili per lo scambio!");
                         dialog.close();
@@ -481,71 +467,68 @@ public class ListaAnnunciView {
         }
     }
 
-private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponibili) {
-    Stage scambioDialog = new Stage();
-    scambioDialog.initModality(Modality.APPLICATION_MODAL);
-    scambioDialog.setTitle("Seleziona oggetti per lo scambio");
+    private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponibili) {
+        Stage scambioDialog = new Stage();
+        scambioDialog.initModality(Modality.APPLICATION_MODAL);
+        scambioDialog.setTitle("Seleziona oggetti per lo scambio");
 
-    VBox scambioCard = card();
-    scambioCard.setSpacing(12);
+        VBox scambioCard = card();
+        scambioCard.setSpacing(12);
 
-    Label lblSelect = l("Scegli i tuoi oggetti da proporre nello scambio:");
-    ListView<Oggetto> listOggetti = new ListView<>();
-    listOggetti.getItems().addAll(oggettiDisponibili);
-    listOggetti.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-    listOggetti.setCellFactory(lv -> new ListCell<>() {
-        @Override
-        protected void updateItem(Oggetto oggetto, boolean empty) {
-            super.updateItem(oggetto, empty);
-            setText(empty || oggetto == null ? null : oggetto.getNome() + " (" + oggetto.getDescrizione() + ")");
-            if (!empty && isSelected()) {
-                setStyle("-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8;");
-            } else if (!empty) {
-                setStyle("-fx-background-color: transparent; -fx-text-fill: #EAF0FF; -fx-padding: 8;");
-            } else {
-                setStyle("");
+        Label lblSelect = l("Scegli i tuoi oggetti da proporre nello scambio:");
+        ListView<Oggetto> listOggetti = new ListView<>();
+        listOggetti.getItems().addAll(oggettiDisponibili);
+        listOggetti.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        listOggetti.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(Oggetto oggetto, boolean empty) {
+                super.updateItem(oggetto, empty);
+                setText(empty || oggetto == null ? null : oggetto.getNome() + " (" + oggetto.getDescrizione() + ")");
+                if (!empty && isSelected()) {
+                    setStyle("-fx-background-color: #4f8cff; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 8;");
+                } else if (!empty) {
+                    setStyle("-fx-background-color: transparent; -fx-text-fill: #EAF0FF; -fx-padding: 8;");
+                } else {
+                    setStyle("");
+                }
             }
-        }
-    });
-    listOggetti.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-control-inner-background: transparent; -fx-border-radius: 12; -fx-background-radius: 12;");
-    listOggetti.setPrefHeight(200);
+        });
+        listOggetti.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-control-inner-background: transparent; -fx-border-radius: 12; -fx-background-radius: 12;");
+        listOggetti.setPrefHeight(200);
 
-    HBox scambioBtns = new HBox(10);
-    scambioBtns.setAlignment(Pos.CENTER_RIGHT);
-    Button scambioAnnulla = ghostButton("Annulla", scambioDialog::close);
-    Button scambioConferma = primaryButton("Invia Offerta di Scambio", () -> {
-        List<Oggetto> selezionati = listOggetti.getSelectionModel().getSelectedItems();
-        if (selezionati.isEmpty()) {
-            warn("Seleziona almeno un oggetto!");
-            return;
-        }
-        List<String> codiciOggetti = selezionati.stream().map(Oggetto::getCodiceOggetto).collect(Collectors.toList());
-        try {
-            // 1. Crea l'offerta di scambio SENZA il prezzo valorizzato
-            controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "scambio", null);
-            // 2. Recupera il codice dell'offerta appena creata
-            String codiceOfferta = controller.getUltimaOffertaScambioUtente();
-            // 3. Associa ogni oggetto selezionato all'offerta, via tabella 'offre'
-            for (String codiceOggetto : codiciOggetti) {
-                controller.associaOggettoAdOfferta(codiceOfferta, codiceOggetto);
+        HBox scambioBtns = new HBox(10);
+        scambioBtns.setAlignment(Pos.CENTER_RIGHT);
+        Button scambioAnnulla = ghostButton("Annulla", scambioDialog::close);
+        Button scambioConferma = primaryButton("Invia Offerta di Scambio", () -> {
+            List<Oggetto> selezionati = listOggetti.getSelectionModel().getSelectedItems();
+            if (selezionati.isEmpty()) {
+                warn("Seleziona almeno un oggetto!");
+                return;
             }
-            scambioDialog.close();
-            warn("Offerta di scambio inviata!");
-        } catch (Exception ex) {
-            warn("Errore invio offerta: " + ex.getMessage());
-        }
-    });
+            List<String> codiciOggetti = selezionati.stream().map(Oggetto::getCodiceOggetto).toList();
+            try {
+                controller.inviaOfferta(annuncio.getCodiceAnnuncio(), "scambio", null);
+                String codiceOfferta = controller.getUltimaOffertaScambioUtente();
+                for (String codiceOggetto : codiciOggetti) {
+                    controller.associaOggettoAdOfferta(codiceOfferta, codiceOggetto);
+                }
+                scambioDialog.close();
+                warn("Offerta di scambio inviata!");
+            } catch (Exception ex) {
+                warn("Errore invio offerta: " + ex.getMessage());
+            }
+        });
 
-    scambioBtns.getChildren().addAll(scambioAnnulla, scambioConferma);
-    scambioCard.getChildren().addAll(lblSelect, listOggetti, scambioBtns);
+        scambioBtns.getChildren().addAll(scambioAnnulla, scambioConferma);
+        scambioCard.getChildren().addAll(lblSelect, listOggetti, scambioBtns);
 
-    StackPane scambioWrap = new StackPane(scambioCard);
-    scambioWrap.setPadding(new Insets(16));
-    scambioWrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
+        StackPane scambioWrap = new StackPane(scambioCard);
+        scambioWrap.setPadding(new Insets(16));
+        scambioWrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
 
-    scambioDialog.setScene(new Scene(scambioWrap, 550, 400));
-    scambioDialog.showAndWait();
-}
+        scambioDialog.setScene(new Scene(scambioWrap, 550, 400));
+        scambioDialog.showAndWait();
+    }
 
 
     // ============================== Helpers UI ==============================
@@ -578,7 +561,7 @@ private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponi
         return tf;
     }
 
-    private void styleCombo(ComboBox<String> cb) {
+    private <T> void styleCombo(ComboBox<T> cb) {
         cb.setStyle("-fx-background-color: rgba(255,255,255,0.10); -fx-text-fill: #EAF0FF; -fx-background-radius: 12; -fx-padding: 2 4; -fx-border-color: transparent;");
         cb.setOnShowing(e -> Platform.runLater(() -> {
             Node popup = cb.lookup(".combo-box-popup");
@@ -635,12 +618,10 @@ private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponi
         return b;
     }
     
-    // --- NUOVO METODO HELPER PER IL PULSANTE "COMPRA SUBITO" ---
     private Button successButton(String text, Runnable action) {
         Button b = new Button(text);
         b.setOnAction(e -> action.run());
         final String baseStyle = "-fx-background-radius: 12; -fx-padding: 10 16; -fx-font-weight: 700; -fx-text-fill: white;";
-        // Colore verde
         final String normalColor = "-fx-background-color: #43a047;"; 
         final String hoverColor = "-fx-background-color: #388e3c;"; 
         b.setStyle(normalColor + baseStyle);
@@ -648,7 +629,6 @@ private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponi
         b.setOnMouseExited(e -> b.setStyle(normalColor + baseStyle));
         return b;
     }
-    // --- FINE NUOVO METODO ---
 
     private Button ghostButton(String text, Runnable action) {
         Button b = new Button(text);
@@ -704,15 +684,14 @@ private void mostraDialogScambio(Annuncio annuncio, List<Oggetto> oggettiDisponi
     private Label statoBadge(String stato) {
         Label badge = new Label(stato.toUpperCase());
         String bg = switch (stato.toLowerCase()) {
-            // --- MODIFICA: Aggiunto stato "concluso" ---
             case "attivo" -> "rgba(122,247,195,0.25)";
-            case "concluso" -> "rgba(79,140,255,0.25)"; // Blu
+            case "concluso" -> "rgba(79,140,255,0.25)";
             case "scaduto" -> "rgba(255,107,107,0.25)";
             default -> "rgba(255,255,255,0.18)";
         };
         String color = switch (stato.toLowerCase()) {
             case "attivo" -> "#7af7c3";
-            case "concluso" -> "#4f8cff"; // Blu
+            case "concluso" -> "#4f8cff";
             case "scaduto" -> "#ff6b6b";
             default -> "#EAF0FF";
         };

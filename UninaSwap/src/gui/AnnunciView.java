@@ -25,7 +25,6 @@ import model.*;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public class AnnunciView {
@@ -33,19 +32,16 @@ public class AnnunciView {
     private VBox root;
     private final Controller controller;
 
-    // Dati
     private final ObservableList<Annuncio> masterData = FXCollections.observableArrayList();
     private FilteredList<Annuncio> filtered;
     private SortedList<Annuncio> sorted;
 
-    // UI
     private TableView<Annuncio> table;
     private ComboBox<String> cbCategoria;
     private ComboBox<String> cbTipologia;
     private TextField tfSearch;
     private Label emptyLabel;
 
-    // Filtri
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(200));
     private List<String> categorie;
 
@@ -55,7 +51,6 @@ public class AnnunciView {
         reloadData();
     }
 
-    // ============================== UI ==============================
     private void createUI() {
         root = new VBox(16);
         root.setPadding(new Insets(16));
@@ -87,9 +82,9 @@ public class AnnunciView {
         cbCategoria.setOnAction(e -> applyFilters());
 
         tfSearch = styledTextField("Cerca per testo o codice…");
+        searchDebounce.setOnFinished(ev -> applyFilters());
         tfSearch.textProperty().addListener((obs, o, n) -> {
             searchDebounce.stop();
-            searchDebounce.setOnFinished(ev -> applyFilters());
             searchDebounce.playFromStart();
         });
 
@@ -154,7 +149,6 @@ public class AnnunciView {
         cState.setCellValueFactory(new PropertyValueFactory<>("stato"));
         cState.setPrefWidth(120);
         cState.setCellFactory(col -> badgeCell());
-
         table.getColumns().setAll(cCod, cCat, cTip, cDesc, cPrice, cState);
         table.setPrefHeight(440);
 
@@ -212,7 +206,6 @@ public class AnnunciView {
         root.getChildren().addAll(header, filtersCard, tableCard);
     }
 
-    // ============================== DATA ==============================
     private void reloadData() {
         try {
             masterData.setAll(controller.getAnnunciByUtente(controller.getUtenteCorrente().getMatricola()));
@@ -255,8 +248,8 @@ public class AnnunciView {
 
             if (!query.isEmpty()) {
                 return (a.getCodiceAnnuncio() != null && a.getCodiceAnnuncio().toLowerCase().contains(query)) ||
-                       (a.getCategoria() != null && a.getCategoria().toLowerCase().contains(query)) ||
-                       (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(query));
+                    (a.getCategoria() != null && a.getCategoria().toLowerCase().contains(query)) ||
+                    (a.getDescrizione() != null && a.getDescrizione().toLowerCase().contains(query));
             }
             return true;
         });
@@ -300,6 +293,116 @@ private void openDialog(Annuncio existing) {
     applyNumericFormatter(prezzo);
     if (existing != null && existing.getPrezzo() != null) {
         prezzo.setText(String.format(Locale.ITALY, "%.2f", existing.getPrezzo()));
+        applyNumericFormatter(prezzo);
+        if (existing != null && existing.getPrezzo() != null) {
+            prezzo.setText(String.format(Locale.ITALY, "%.2f", existing.getPrezzo()));
+        }
+        
+        Label prezzoLabel = l("Prezzo");
+        tipBox.valueProperty().addListener((obs, oldV, newV) -> {
+            boolean isVendita = "vendita".equalsIgnoreCase(newV);
+            prezzoLabel.setVisible(isVendita);
+            prezzo.setVisible(isVendita);
+        });
+        prezzoLabel.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
+        prezzo.setVisible("vendita".equalsIgnoreCase(tipBox.getValue()));
+
+        ComboBox<model.Oggetto> oggettiBox = new ComboBox<>();
+        if (existing == null) {
+            try {
+                List<model.Oggetto> tuttiOggetti = controller.getOggettiByUtente(controller.getUtenteCorrente().getMatricola());
+                List<model.Oggetto> oggettiDisponibili = tuttiOggetti.stream()
+                    .filter(o -> o.getCodiceAnnuncio() == null || o.getCodiceAnnuncio().isEmpty())
+                    .toList();
+                
+                oggettiBox.getItems().setAll(oggettiDisponibili);
+                oggettiBox.setPromptText("Seleziona oggetto da associare");
+                oggettiBox.setCellFactory(list -> new ListCell<>() {
+                    @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+                    }
+                });
+                oggettiBox.setButtonCell(new ListCell<>() {
+                    @Override protected void updateItem(model.Oggetto item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : item.getNome() + " (" + item.getCodiceOggetto() + ")");
+                    }
+                });
+            } catch (SQLException e) {
+                warn("Errore nel caricamento oggetti: " + e.getMessage());
+            }
+        }
+
+        ComboBox<String> stateBox = null;
+        if (existing != null) {
+            stateBox = new ComboBox<>();
+            stateBox.getItems().addAll("attivo", "scaduto", "in attesa");
+            stateBox.setValue(existing.getStato());
+            styleCombo(stateBox);
+        }
+
+        int r = 0;
+        form.add(l("Categoria"), 0, r); form.add(catBox, 1, r++);
+        form.add(l("Tipologia"), 0, r); form.add(tipBox, 1, r++);
+        form.add(l("Descrizione"), 0, r); form.add(desc, 1, r++);
+        form.add(prezzoLabel, 0, r); form.add(prezzo, 1, r++);
+        
+        if (existing == null) {
+            form.add(l("Oggetto"), 0, r); form.add(oggettiBox, 1, r++);
+        } else {
+            form.add(l("Stato"), 0, r); form.add(stateBox, 1, r);
+        }
+
+        HBox btns = new HBox(10);
+        btns.setAlignment(Pos.CENTER_RIGHT);
+        Button annulla = ghostButton("Annulla", dialog::close);
+        final ComboBox<String> finalStateBox = stateBox;
+        Button conferma = primaryButton(existing == null ? "Crea" : "Aggiorna", () -> {
+            String categoria = catBox.getEditor().getText() != null ? catBox.getEditor().getText().trim() : "";
+            String tip = tipBox.getValue();
+            String d = desc.getText() != null ? desc.getText().trim() : "";
+
+            if (categoria.isEmpty() || tip == null || d.isEmpty() || (existing != null && (finalStateBox.getValue() == null || finalStateBox.getValue().isEmpty()))) {
+                warn("Compila tutti i campi obbligatori.");
+                return;
+            }
+
+            double price = 0.0;
+            if ("vendita".equalsIgnoreCase(tip)) {
+                try {
+                    price = Double.parseDouble(prezzo.getText().replace(",", "."));
+                } catch (NumberFormatException | NullPointerException ex) {
+                    warn("Prezzo non valido."); return;
+                }
+            }
+            try {
+                if (existing == null) {
+                    model.Oggetto selezionato = oggettiBox.getValue();
+                    if (selezionato == null) {
+                        warn("Devi associare un tuo oggetto all'annuncio.");
+                        return;
+                    }
+                    controller.creaAnnuncio(categoria, tip, d, price, selezionato.getCodiceOggetto());
+                } else {
+                    controller.modificaAnnuncio(existing.getCodiceAnnuncio(), categoria, tip, d, price, finalStateBox.getValue());
+                }
+                dialog.close();
+                reloadData();
+            } catch (SQLException ex) {
+                warn("Errore salvataggio: " + ex.getMessage());
+            }
+        });
+        btns.getChildren().addAll(annulla, conferma);
+
+        card.getChildren().addAll(form, btns);
+
+        StackPane wrap = new StackPane(card);
+        wrap.setPadding(new Insets(16));
+        wrap.setStyle("-fx-background-color: linear-gradient(to bottom right, #0b1020, #121a36);");
+
+        dialog.setScene(new Scene(wrap, 520, existing == null ? 380 : 440));
+        dialog.showAndWait();
     }
     Label prezzoLabel = l("Prezzo");
     tipBox.valueProperty().addListener((obs, oldV, newV) -> {
@@ -447,7 +550,6 @@ private void openDialog(Annuncio existing) {
         });
     }
 
-    // ============================== Helpers UI ==============================
     private VBox card() {
         VBox card = new VBox();
         card.setPadding(new Insets(16));
@@ -481,8 +583,6 @@ private void openDialog(Annuncio existing) {
         );
         return tf;
     }
-
- // prima: private void styleCombo(ComboBox<String> cb)
     private <T> void styleCombo(ComboBox<T> cb) {
         cb.setStyle(
             "-fx-background-color: rgba(255,255,255,0.10);" +
@@ -507,8 +607,6 @@ private void openDialog(Annuncio existing) {
         styleComboItems(cb); // già generico
     }
 
-
-    // *** METODO MODIFICATO PER LA LEGGIBILITÀ ***
     private <T> void styleComboItems(ComboBox<T> combo) {
         combo.setButtonCell(new ListCell<>() {
             @Override
@@ -526,10 +624,9 @@ private void openDialog(Annuncio existing) {
                     super.updateItem(item, empty);
                     setText(empty || item == null ? null : String.valueOf(item));
                     if (!empty) {
-                        // Stile base di ogni cella nel popup
                         setStyle(
                             "-fx-text-fill: #EAF0FF;" +
-                            "-fx-background-color: #181b23;" + // **MODIFICA**: Sfondo scuro per ogni cella
+                            "-fx-background-color: #181b23;" +
                             "-fx-padding: 8 12;" +
                             "-fx-font-size: 14px;"
                         );
@@ -540,7 +637,6 @@ private void openDialog(Annuncio existing) {
             };
             cell.setOnMouseEntered(e -> {
                 if (!cell.isEmpty()) {
-                    // Stile al passaggio del mouse (hover)
                     cell.setStyle(
                         "-fx-text-fill: white;" +
                         "-fx-background-color: #4f8cff;" +
@@ -552,10 +648,9 @@ private void openDialog(Annuncio existing) {
             });
             cell.setOnMouseExited(e -> {
                 if (!cell.isEmpty()) {
-                    // Ripristina lo stile base quando il mouse esce
                     cell.setStyle(
                         "-fx-text-fill: #EAF0FF;" +
-                        "-fx-background-color: #181b23;" + // **MODIFICA**: Ripristina lo sfondo scuro
+                        "-fx-background-color: #181b23;" +
                         "-fx-padding: 8 12;" +
                         "-fx-font-size: 14px;"
                     );
@@ -625,6 +720,34 @@ private void openDialog(Annuncio existing) {
         });
     }
     
+    private String zebraStyle(int idx) {
+        return idx % 2 == 0 ?
+            "-fx-background-color: rgba(255,255,255,0.03);" :
+            "-fx-background-color: rgba(122,247,195,0.09);";
+    }
+    
+    private void applyNumericFormatter(TextField tf) {
+        UnaryOperator<TextFormatter.Change> filter = change -> {
+            String newText = change.getControlNewText();
+            if (newText.matches("\\d*[,.]?\\d{0,2}")) {
+                return change;
+            }
+            return null;
+        };
+        tf.setTextFormatter(new TextFormatter<>(filter));
+    }
+    
+    private void warn(String msg) {
+        Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
+        a.setHeaderText(null);
+        a.showAndWait();
+    }
+    
+    public void mostraCreaAnnuncioDialog() {
+        openDialog(null);
+    }
+
+    
     private TableCell<Annuncio, String> badgeCell() {
         return new TableCell<>() {
             @Override protected void updateItem(String stato, boolean empty) {
@@ -657,33 +780,5 @@ private void openDialog(Annuncio existing) {
             }
         };
     }
-    
-    private String zebraStyle(int idx) {
-        return idx % 2 == 0 ?
-            "-fx-background-color: rgba(255,255,255,0.03);" :
-            "-fx-background-color: rgba(122,247,195,0.09);";
-    }
-    
-    private void applyNumericFormatter(TextField tf) {
-        UnaryOperator<TextFormatter.Change> filter = change -> {
-            String newText = change.getControlNewText();
-            if (newText.matches("\\d*[,.]?\\d{0,2}")) {
-                return change;
-            }
-            return null;
-        };
-        tf.setTextFormatter(new TextFormatter<>(filter));
-    }
-    
-    private void warn(String msg) {
-        Alert a = new Alert(Alert.AlertType.WARNING, msg, ButtonType.OK);
-        a.setHeaderText(null);
-        a.showAndWait();
-    }
-    
-    public void mostraCreaAnnuncioDialog() {
-        openDialog(null);
-    }
-
     public VBox getRoot() { return root; }
 }
