@@ -9,21 +9,9 @@ public class Offre {
         this.codiceOggetto = codiceOggetto;
     }
 
-	public String getCodiceOfferta() {
-		return codiceOfferta;
-	}
+    public String getCodiceOfferta() { return codiceOfferta; }
+    public void setCodiceOfferta(String codiceOfferta) { this.codiceOfferta = codiceOfferta; }
 
-	public void setCodiceOfferta(String codiceOfferta) {
-		this.codiceOfferta = codiceOfferta;
-	}
-
-	public String getCodiceOggetto() {
-		return codiceOggetto;
-	}
-
-	public void setCodiceOggetto(String codiceOggetto) {
-		this.codiceOggetto = codiceOggetto;
-	}
-
- 
+    public String getCodiceOggetto() { return codiceOggetto; }
+    public void setCodiceOggetto(String codiceOggetto) { this.codiceOggetto = codiceOggetto; }
 }

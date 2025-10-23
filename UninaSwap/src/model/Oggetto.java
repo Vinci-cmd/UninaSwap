@@ -15,45 +15,18 @@ public class Oggetto {
         this.codiceAnnuncio = codiceAnnuncio;
     }
 
-	public String getCodiceOggetto() {
-		return codiceOggetto;
-	}
+    public String getCodiceOggetto() { return codiceOggetto; }
+    public void setCodiceOggetto(String codiceOggetto) { this.codiceOggetto = codiceOggetto; }
 
-	public void setCodiceOggetto(String codiceOggetto) {
-		this.codiceOggetto = codiceOggetto;
-	}
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
 
-	public String getNome() {
-		return nome;
-	}
+    public String getDescrizione() { return descrizione; }
+    public void setDescrizione(String descrizione) { this.descrizione = descrizione; }
 
-	public void setNome(String nome) {
-		this.nome = nome;
-	}
+    public String getCategoria() { return categoria; }
+    public void setCategoria(String categoria) { this.categoria = categoria; }
 
-	public String getDescrizione() {
-		return descrizione;
-	}
-
-	public void setDescrizione(String descrizione) {
-		this.descrizione = descrizione;
-	}
-
-	public String getCategoria() {
-		return categoria;
-	}
-
-	public void setCategoria(String categoria) {
-		this.categoria = categoria;
-	}
-
-	public String getCodiceAnnuncio() {
-		return codiceAnnuncio;
-	}
-
-	public void setCodiceAnnuncio(String codiceAnnuncio) {
-		this.codiceAnnuncio = codiceAnnuncio;
-	}
-
-
+    public String getCodiceAnnuncio() { return codiceAnnuncio; }
+    public void setCodiceAnnuncio(String codiceAnnuncio) { this.codiceAnnuncio = codiceAnnuncio; }
 }

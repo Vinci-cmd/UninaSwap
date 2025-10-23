@@ -1,37 +1,55 @@
 package Controller;
 
+import dao.*;
 import javafx.collections.FXCollections;
-import java.util.*;
 import javafx.collections.ObservableList;
-import javafx.scene.chart.XYChart; // <-- IMPORT AGGIUNTO
 import model.*;
-import service.Service;
+
+import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
- * Controller dell'applicazione UninaSwap.
- * Gestisce login/registrazione, annunci, offerte e oggetti, delegando la logica al Service.
+ * Controller principale dell'applicazione UninaSwap.
+ * Gestisce login/registrazione, annunci, offerte e oggetti.
+ * Integra tutta la logica di business precedentemente nel Service.
  */
 public class Controller {
 
     // =========================================================
-    // == CAMPI / COSTRUTTORI
+    // == CAMPI / DAO
     // =========================================================
-    private final Service service;
+    private AnnuncioDAO annuncioDAO;
+    private OffertaDAO offertaDAO;
+    private OffreDAO offreDAO;
+    private OggettoDAO oggettoDAO;
+    private TipoConsegnaDAO tipoConsegnaDAO;
+    private UtenteDAO utenteDAO;
+
     private Utente utenteCorrente;
 
-    public Controller(Service service) {
-        this.service = service;
+    // =========================================================
+    // == COSTRUTTORE
+    // =========================================================
+    public Controller(Connection conn) {
+        this.annuncioDAO = new AnnuncioDAO(conn);
+        this.offertaDAO = new OffertaDAO(conn);
+        this.offreDAO = new OffreDAO(conn);
+        this.oggettoDAO = new OggettoDAO(conn);
+        this.tipoConsegnaDAO = new TipoConsegnaDAO(conn);
+        this.utenteDAO = new UtenteDAO(conn);
     }
 
     // =========================================================
     // == AUTHENTICATION (Login / Registrazione / Logout)
     // =========================================================
 
-    // -------------------- AUTH: Login --------------------
+    /**
+     * Login utente.
+     */
     public boolean login(String email, String password) {
         try {
             String e = email == null ? "" : email.trim();
@@ -40,7 +58,7 @@ public class Controller {
                 showError("Email e password sono obbligatorie.");
                 return false;
             }
-            Utente utente = service.login(e, p); // delega al Service
+            Utente utente = utenteDAO.login(e, p);
             if (utente != null) {
                 utenteCorrente = utente;
                 return true;
@@ -51,21 +69,9 @@ public class Controller {
         return false;
     }
 
-    // -------------------- AUTH: Registrazione --------------------
-    // Ottiene solo le offerte inviate dall'utente (non ricevute)
-    public List<Offerta> getOfferteInviateByUtente(String matricola) throws SQLException {
-        return service.getOfferteInviateByUtente(matricola);
-    }
-
-    // Recupera la descrizione di un annuncio dato il codice
-    public String getDescrizioneAnnuncio(String codiceAnnuncio) throws SQLException {
-        return service.getDescrizioneAnnuncio(codiceAnnuncio);
-    }
-
-    public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
-        return service.getOfferteRicevuteByUtente(matricola);
-    }
-
+    /**
+     * Registrazione nuovo utente.
+     */
     public boolean register(String nome, String cognome, String matricola, String email, String password, String universita) {
         try {
             String n = safeTrim(nome);
@@ -89,7 +95,7 @@ public class Controller {
             }
 
             Utente nuovo = new Utente(m, n, c, e, p, u);
-            boolean ok = service.creaUtente(nuovo);
+            boolean ok = utenteDAO.creaUtente(nuovo);
             if (!ok) showError("Registrazione non riuscita.");
             return ok;
 
@@ -102,69 +108,59 @@ public class Controller {
             return false;
         }
     }
-    
-    public List<String> getNotificheUtente(String matricola) {
-        List<String> notif = new ArrayList<>();
-        try {
-            // 1. Ottieni i tuoi annunci
-            List<Annuncio> mieiAnnunci = getAnnunciByUtente(matricola);
-            int offerteRicevute = 0;
-            
-            // 2. Per ogni annuncio, carica le sue offerte e filtra quelle "inviata"
-            for (Annuncio a : mieiAnnunci) {
-                List<Offerta> offerteSuAnnuncio = service.getOfferteByCodiceAnnuncio(a.getCodiceAnnuncio()); // <-- serve/implementa questo metodo se non esiste!
-                for (Offerta o : offerteSuAnnuncio) {
-                    if ("inviata".equalsIgnoreCase(o.getStato())) {
-                        offerteRicevute++;
-                    }
-                }
-            }
-            if (offerteRicevute > 0)
-                notif.add("Hai " + offerteRicevute + " offerte ricevute da accettare.");
 
-            // Annunci scaduti (già va bene come hai)
-            int annunciScaduti = 0;
-            for (Annuncio a : mieiAnnunci) {
-                if ("scaduto".equalsIgnoreCase(a.getStato())) {
-                    annunciScaduti++;
-                }
-            }
-            if (annunciScaduti > 0)
-                notif.add("Hai " + annunciScaduti + " annunci scaduti.");
-
-        } catch (Exception e) {
-            notif.add("Errore nel caricamento notifiche.");
-        }
-        return notif;
+    /**
+     * Logout.
+     */
+    public void logout() {
+        utenteCorrente = null;
     }
 
     /**
-     * Restituisce l'utente correntemente loggato (può essere null).
+     * Restituisce l'utente correntemente loggato.
      */
     public Utente getUtenteCorrente() {
         return utenteCorrente;
     }
-    
-    public Utente getUtenteByMatricola(String matricola) throws SQLException {
-        return service.getUtenteByMatricola(matricola);
-    }
-    
 
-    public void logout() {
-        utenteCorrente = null;
+    /**
+     * Recupera utente per matricola.
+     */
+    public Utente getUtenteByMatricola(String matricola) throws SQLException {
+        return utenteDAO.getUtenteByMatricola(matricola);
+    }
+
+    /**
+     * Aggiorna dati utente.
+     */
+    public boolean aggiornaUtente(Utente utente) throws SQLException {
+        return utenteDAO.aggiornaUtente(utente);
+    }
+
+    /**
+     * Elimina utente.
+     */
+    public boolean eliminaUtente(String matricola) throws SQLException {
+        return utenteDAO.eliminaUtente(matricola);
     }
 
     // =========================================================
     // == ANNUNCI
     // =========================================================
 
+    /**
+     * Ottiene tutti gli annunci attivi (raw).
+     */
     public List<Annuncio> getAnnunciAttiviRaw() throws SQLException {
-        return service.getAnnunciAttivi();
+        return annuncioDAO.getAnnunciAttivi();
     }
 
+    /**
+     * Ottiene annunci attivi formattati per la GUI.
+     */
     public ObservableList<String> getAnnunciAttiviFormatted() {
         try {
-            List<Annuncio> annunci = service.getAnnunciAttivi();
+            List<Annuncio> annunci = annuncioDAO.getAnnunciAttivi();
             ObservableList<String> items = FXCollections.observableArrayList();
             for (Annuncio a : annunci) {
                 String prezzo = (a.getPrezzo() != null) ? "€" + a.getPrezzo() : "Gratis";
@@ -180,10 +176,38 @@ public class Controller {
         }
     }
 
+    /**
+     * Annunci di un utente specifico.
+     */
     public List<Annuncio> getAnnunciByUtente(String matricola) throws SQLException {
-        return service.getAnnunciByUtente(matricola);
+        return annuncioDAO.getAnnunciByUtente(matricola);
     }
 
+    /**
+     * Recupera annuncio per codice.
+     */
+    public Annuncio getAnnuncioByCodice(String codiceAnnuncio) throws SQLException {
+        return annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+    }
+
+    /**
+     * Annunci filtrati per categoria e tipologia.
+     */
+    public List<Annuncio> getAnnunciFiltrati(String categoria, String tipologia) throws SQLException {
+        return annuncioDAO.getAnnunciFiltrati(categoria, tipologia);
+    }
+
+    /**
+     * Recupera descrizione annuncio dato il codice.
+     */
+    public String getDescrizioneAnnuncio(String codiceAnnuncio) throws SQLException {
+        Annuncio ann = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
+        return ann != null ? ann.getDescrizione() : "";
+    }
+
+    /**
+     * Crea nuovo annuncio.
+     */
     public boolean creaAnnuncio(String categoria, String tipologia, String descrizione, double prezzo) throws SQLException {
         Date oggi = new Date(System.currentTimeMillis());
         Annuncio nuovoAnnuncio = new Annuncio(
@@ -196,16 +220,19 @@ public class Controller {
                 oggi,
                 utenteCorrente.getMatricola()
         );
-        return service.creaAnnuncio(nuovoAnnuncio);
+        return annuncioDAO.creaAnnuncio(nuovoAnnuncio);
     }
 
+    /**
+     * Modifica annuncio esistente.
+     */
     public boolean modificaAnnuncio(String codiceAnnuncio,
                                     String categoria,
                                     String tipologia,
                                     String descrizione,
                                     double prezzo,
                                     String stato) throws SQLException {
-        Annuncio esistente = service.getAnnuncioByCodice(codiceAnnuncio);
+        Annuncio esistente = annuncioDAO.getAnnuncioByCodice(codiceAnnuncio);
 
         Annuncio aggiornato = new Annuncio(
                 codiceAnnuncio,
@@ -218,160 +245,354 @@ public class Controller {
                 esistente.getMatricola()
         );
 
-        // Usa quello che preferisci tra aggiornaAnnuncio / modificaAnnuncio
-        return service.aggiornaAnnuncio(aggiornato);
-        // return service.modificaAnnuncio(aggiornato);
+        return annuncioDAO.aggiornaAnnuncio(aggiornato);
     }
 
+    /**
+     * Elimina annuncio.
+     */
     public void eliminaAnnuncio(String codiceAnnuncio) throws SQLException {
-        service.eliminaAnnuncio(codiceAnnuncio);
+        annuncioDAO.eliminaAnnuncio(codiceAnnuncio);
     }
 
     // =========================================================
     // == OFFERTE
     // =========================================================
 
+    /**
+     * Offerte ricevute da un utente (sul proprio annuncio).
+     */
+    public List<Offerta> getOfferteRicevuteByUtente(String matricola) throws SQLException {
+        return offertaDAO.getOfferteRicevuteByUtente(matricola);
+    }
+
+    /**
+     * Offerte inviate da un utente.
+     */
+    public List<Offerta> getOfferteInviateByUtente(String matricola) throws SQLException {
+        return offertaDAO.getOfferteInviateByUtente(matricola);
+    }
+
+    /**
+     * Offerte per un annuncio specifico.
+     */
     public List<Offerta> getOfferteByAnnuncio(String codiceAnnuncio) throws SQLException {
-        return service.getOfferteByAnnuncio(codiceAnnuncio);
+        return offertaDAO.getOfferteByAnnuncio(codiceAnnuncio);
     }
 
+    /**
+     * Offerte di un utente (generico).
+     */
     public List<Offerta> getOfferteByUtente(String matricola) throws SQLException {
-        return service.getOfferteByUtente(matricola);
+        return offertaDAO.getOfferteByUtente(matricola);
     }
 
+    /**
+     * Recupera offerta per codice.
+     */
+    public Offerta getOffertaByCodice(String codiceOfferta) throws SQLException {
+        return offertaDAO.getOffertaByCodice(codiceOfferta);
+    }
+
+    /**
+     * Recupera offerte dato il codice annuncio.
+     */
+    public List<Offerta> getOfferteByCodiceAnnuncio(String codiceAnnuncio) throws SQLException {
+        return offertaDAO.getOfferteByCodiceAnnuncio(codiceAnnuncio);
+    }
+
+    /**
+     * Invia offerta con controllo logica di business.
+     */
+    public boolean inviaOfferta(Offerta offerta, List<String> codiciOggetti) throws SQLException {
+        Annuncio annuncio = annuncioDAO.getAnnuncioByCodice(offerta.getCodiceAnnuncio());
+        if (annuncio == null) throw new SQLException("Annuncio non trovato");
+        if (annuncio.getMatricola().equals(offerta.getMatricola()))
+            throw new SQLException("Non puoi inviare offerte ai tuoi stessi annunci");
+        if (!"attivo".equals(annuncio.getStato()))
+            throw new SQLException("Non è possibile inviare offerte su annunci non attivi");
+        if (!offerta.getTipo().equals(annuncio.getTipologia()))
+            throw new SQLException("La tipologia dell'offerta deve coincidere con quella dell'annuncio");
+        if ("vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() == null)
+            throw new SQLException("Una offerta di vendita deve avere prezzoOfferto valorizzato");
+        if (!"vendita".equals(offerta.getTipo()) && offerta.getPrezzoOfferto() != null)
+            throw new SQLException("Solo le offerte di tipo vendita possono avere prezzoOfferto valorizzato");
+
+        boolean inserita = offertaDAO.creaOfferta(offerta);
+        if (!inserita) throw new SQLException("Errore durante l'inserimento dell'offerta");
+
+        if ("scambio".equals(offerta.getTipo()) && codiciOggetti != null) {
+            for (String codiceOggetto : codiciOggetti) {
+                Oggetto oggetto = oggettoDAO.getOggettoByCodice(codiceOggetto);
+                if (oggetto == null) throw new SQLException("Oggetto " + codiceOggetto + " non trovato");
+                offreDAO.aggiungiOggettoAScambio(offerta.getCodiceOfferta(), codiceOggetto);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Invia offerta (semplificata con parametri diretti).
+     */
     public boolean inviaOfferta(String codiceAnnuncio, String tipo, Double prezzoOfferto) throws SQLException {
-        return service.inviaOffertaLogica(codiceAnnuncio, tipo, prezzoOfferto, utenteCorrente.getMatricola());
-    }
-    public boolean inviaOfferta(String codiceAnnuncio, String tipo, Double prezzoOfferto, String messaggio) throws SQLException {
-        return service.inviaOffertaComplessiva(codiceAnnuncio, tipo, prezzoOfferto, messaggio, utenteCorrente.getMatricola());
-    }
-    
-    public boolean inviaOffertaConOggetti(String codiceAnnuncio, List<String> codiciOggetti) throws SQLException {
-        return service.inviaOffertaConOggettiLogica(codiceAnnuncio, codiciOggetti, utenteCorrente.getMatricola());
+        Offerta offerta = new Offerta();
+        offerta.setCodiceAnnuncio(codiceAnnuncio);
+        offerta.setTipo(tipo);
+        offerta.setPrezzoOfferto(prezzoOfferto);
+        offerta.setMatricola(utenteCorrente.getMatricola());
+        offerta.setStato("inviata");
+        offerta.setCodiceOfferta(UUID.randomUUID().toString());
+        return inviaOfferta(offerta, null);
     }
 
+    /**
+     * Invia offerta con messaggio.
+     */
+    public boolean inviaOfferta(String codiceAnnuncio, String tipo, Double prezzoOfferto, String messaggio) throws SQLException {
+        Offerta offerta = new Offerta();
+        offerta.setCodiceAnnuncio(codiceAnnuncio);
+        offerta.setTipo(tipo);
+        offerta.setPrezzoOfferto(prezzoOfferto);
+        offerta.setMatricola(utenteCorrente.getMatricola());
+        offerta.setStato("inviata");
+        offerta.setMessaggio(messaggio);
+        offerta.setCodiceOfferta(UUID.randomUUID().toString());
+        return offertaDAO.creaOfferta(offerta);
+    }
+
+    /**
+     * Invia offerta con oggetti (scambio).
+     */
+    public boolean inviaOffertaConOggetti(String codiceAnnuncio, List<String> codiciOggetti) throws SQLException {
+        Offerta offerta = new Offerta();
+        offerta.setCodiceAnnuncio(codiceAnnuncio);
+        offerta.setTipo("scambio");
+        offerta.setMatricola(utenteCorrente.getMatricola());
+        offerta.setStato("inviata");
+        offerta.setCodiceOfferta(UUID.randomUUID().toString());
+        return inviaOfferta(offerta, codiciOggetti);
+    }
+
+    /**
+     * Accetta offerta.
+     */
     public boolean accettaOfferta(String codiceOfferta) {
         try {
-            return service.accettaOfferta(codiceOfferta);
+            return offertaDAO.accettaOfferta(codiceOfferta);
         } catch (SQLException e) {
             showError("Errore accettazione offerta: " + e.getMessage());
             return false;
         }
     }
 
+    /**
+     * Rifiuta offerta.
+     */
     public boolean rifiutaOfferta(String codiceOfferta) {
         try {
-            return service.rifiutaOfferta(codiceOfferta);
+            return offertaDAO.rifiutaOfferta(codiceOfferta);
         } catch (SQLException e) {
             showError("Errore rifiuto offerta: " + e.getMessage());
             return false;
         }
     }
-    
+
+    /**
+     * Elimina offerta.
+     */
+    public boolean eliminaOfferta(String codiceOfferta) throws SQLException {
+        return offertaDAO.eliminaOfferta(codiceOfferta);
+    }
+
     // =========================================================
     // == OGGETTI
     // =========================================================
 
+    /**
+     * Recupera oggetti di un utente (solo codici).
+     */
     public List<String> getOggettiUtente(String matricola) throws SQLException {
-        List<Oggetto> oggetti = service.getOggettiUtente(matricola);
+        List<Oggetto> oggetti = oggettoDAO.getOggettiByMatricola(matricola);
         List<String> codici = new ArrayList<>();
         for (Oggetto o : oggetti) {
             codici.add(o.getCodiceOggetto());
         }
         return codici;
     }
+
+    /**
+     * Recupera oggetti di un utente (oggetti completi).
+     */
     public List<Oggetto> getOggettiUtenteObj(String matricola) throws SQLException {
-        return service.getOggettiUtente(matricola);
+        return oggettoDAO.getOggettiByMatricola(matricola);
     }
-    
+
+    /**
+     * Recupera oggetto per codice.
+     */
+    public Oggetto getOggettoByCodice(String codiceOggetto) throws SQLException {
+        return oggettoDAO.getOggettoByCodice(codiceOggetto);
+    }
+
+    /**
+     * Oggetti associati a un annuncio.
+     */
+    public List<Oggetto> getOggettiByAnnuncio(String codiceAnnuncio) throws SQLException {
+        return oggettoDAO.getOggettiByAnnuncio(codiceAnnuncio);
+    }
+
+    /**
+     * Crea nuovo oggetto.
+     */
     public boolean creaOggetto(Oggetto oggetto) throws SQLException {
         String matricola = getUtenteCorrente().getMatricola();
-        return service.creaOggetto(oggetto, matricola);
+        return oggettoDAO.creaOggetto(oggetto, matricola);
     }
-    
+
+    /**
+     * Modifica oggetto esistente.
+     */
     public boolean modificaOggetto(Oggetto oggetto) throws SQLException {
-    	return service.modificaOggetto(oggetto);
+        return oggettoDAO.aggiornaOggetto(oggetto);
     }
-    
-    public boolean eliminaOggetto(String codiceOggetto) throws SQLException{
-        return service.eliminaOggetto(codiceOggetto);
-    }	
+
+    /**
+     * Elimina oggetto.
+     */
+    public boolean eliminaOggetto(String codiceOggetto) throws SQLException {
+        return oggettoDAO.eliminaOggetto(codiceOggetto);
+    }
+
+    /**
+     * Aggiorna codice annuncio di un oggetto.
+     */
     public void aggiornaCodiceAnnuncioOggetto(String codiceOggetto, String codiceAnnuncio) throws SQLException {
-        service.aggiornaCodiceAnnuncioOggetto(codiceOggetto, codiceAnnuncio);
-    }
-
-    
-    public boolean eliminaOfferta(String codiceOfferta) throws SQLException {
-        return service.eliminaOfferta(codiceOfferta);
-    }
-    
-    // =========================================================
-    // == NUOVI METODI PER REPORTVIEW (INIZIO)
-    // =========================================================
-
-    public Map<String, Integer> getStatisticheGenerali(boolean sempre) throws SQLException {
-        // TODO: Implementare la logica nel Service (e DAO) per recuperare le statistiche
-        // Questa è solo una implementazione di esempio con dati fittizi.
-        Map<String, Integer> stats = new HashMap<>();
-        stats.put("annunci", 18);
-        stats.put("offerteInviate", 27);
-        // Tasso di successo come intero (es. 35 per 35%)
-        stats.put("tassoSuccesso", 35);
-        return stats;
-    }
-
-    public Map<String, Integer> getDatiGraficoTortaTipologie() throws SQLException {
-        // TODO: Implementare la logica nel Service (e DAO)
-        Map<String, Integer> dati = new HashMap<>();
-        dati.put("Vendita", 10);
-        dati.put("Scambio", 5);
-        dati.put("Regalo", 3);
-        return dati;
-    }
-
-    public Map<String, Integer> getDatiGraficoBarreOfferte() throws SQLException {
-        // TODO: Implementare la logica nel Service (e DAO)
-        Map<String, Integer> dati = new HashMap<>();
-        dati.put("InviateVendita", 15);
-        dati.put("InviateScambio", 8);
-        dati.put("InviateRegalo", 4);
-        dati.put("RicevuteVendita", 12);
-        dati.put("RicevuteScambio", 10);
-        dati.put("RicevuteRegalo", 2);
-        return dati;
-    }
-    
-    public Map<String, XYChart.Series<String, Number>> getDatiGraficoAndamento() throws SQLException {
-        // TODO: Implementare la logica nel Service (e DAO) per l'andamento degli ultimi 30 giorni
-        Map<String, XYChart.Series<String, Number>> dati = new HashMap<>();
-        
-        XYChart.Series<String, Number> annunciSeries = new XYChart.Series<>();
-        annunciSeries.setName("Annunci Pubblicati");
-        // Dati di esempio
-        annunciSeries.getData().add(new XYChart.Data<>("1 Mag", 1));
-        annunciSeries.getData().add(new XYChart.Data<>("5 Mag", 3));
-        annunciSeries.getData().add(new XYChart.Data<>("12 Mag", 5));
-        annunciSeries.getData().add(new XYChart.Data<>("20 Mag", 8));
-        annunciSeries.getData().add(new XYChart.Data<>("28 Mag", 10));
-
-        XYChart.Series<String, Number> offerteSeries = new XYChart.Series<>();
-        offerteSeries.setName("Offerte Inviate");
-        // Dati di esempio
-        offerteSeries.getData().add(new XYChart.Data<>("1 Mag", 2));
-        offerteSeries.getData().add(new XYChart.Data<>("5 Mag", 5));
-        offerteSeries.getData().add(new XYChart.Data<>("12 Mag", 8));
-        offerteSeries.getData().add(new XYChart.Data<>("20 Mag", 12));
-        offerteSeries.getData().add(new XYChart.Data<>("28 Mag", 15));
-
-        dati.put("annunci", annunciSeries);
-        dati.put("offerte", offerteSeries);
-        
-        return dati;
+        oggettoDAO.aggiornaCodiceAnnuncioOggetto(codiceOggetto, codiceAnnuncio);
     }
 
     // =========================================================
-    // == NUOVI METODI PER REPORTVIEW (FINE)
+    // == TIPI CONSEGNA
     // =========================================================
+
+    /**
+     * Crea tipo consegna.
+     */
+    public boolean creaTipoConsegna(TipoConsegna consegna) throws SQLException {
+        return tipoConsegnaDAO.creaTipoConsegna(consegna);
+    }
+
+    /**
+     * Aggiorna tipo consegna.
+     */
+    public boolean aggiornaTipoConsegna(TipoConsegna consegna) throws SQLException {
+        return tipoConsegnaDAO.aggiornaTipoConsegna(consegna);
+    }
+
+    /**
+     * Elimina tipo consegna.
+     */
+    public boolean eliminaTipoConsegna(String codiceConsegna) throws SQLException {
+        return tipoConsegnaDAO.eliminaTipoConsegna(codiceConsegna);
+    }
+
+    /**
+     * Consegne associate a un annuncio.
+     */
+    public List<TipoConsegna> getConsegneByAnnuncio(String codiceAnnuncio) throws SQLException {
+        return tipoConsegnaDAO.getConsegneByAnnuncio(codiceAnnuncio);
+    }
+
+    // =========================================================
+    // == STATISTICHE
+    // =========================================================
+
+    /**
+     * Totale offerte complessive.
+     */
+    public int getTotaleOfferte() {
+        try {
+            return offertaDAO.getTotaleOfferte();
+        } catch (SQLException e) {
+            showError("Errore getTotaleOfferte: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Totale offerte per tipologia.
+     */
+    public int getTotaleOffertePerTipologia(String tipologia) {
+        try {
+            return offertaDAO.getTotaleOffertePerTipologia(tipologia);
+        } catch (SQLException e) {
+            showError("Errore getTotaleOffertePerTipologia: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Offerte accettate per tipologia.
+     */
+    public int getOfferteAccettatePerTipologia(String tipologia) {
+        try {
+            return offertaDAO.getOfferteAccettatePerTipologia(tipologia);
+        } catch (SQLException e) {
+            showError("Errore getOfferteAccettatePerTipologia: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Statistiche vendite accettate.
+     */
+    public double[] getStatisticheVenditeAccettate() {
+        try {
+            return offertaDAO.getStatisticheVenditeAccettate();
+        } catch (SQLException e) {
+            showError("Errore getStatisticheVenditeAccettate: " + e.getMessage());
+            return new double[0];
+        }
+    }
+
+    // =========================================================
+    // == NOTIFICHE
+    // =========================================================
+
+    /**
+     * Genera notifiche per l'utente (offerte ricevute, annunci scaduti).
+     */
+    public List<String> getNotificheUtente(String matricola) {
+        List<String> notif = new ArrayList<>();
+        try {
+            List<Annuncio> mieiAnnunci = getAnnunciByUtente(matricola);
+            int offerteRicevute = 0;
+
+            for (Annuncio a : mieiAnnunci) {
+                List<Offerta> offerteSuAnnuncio = offertaDAO.getOfferteByCodiceAnnuncio(a.getCodiceAnnuncio());
+                for (Offerta o : offerteSuAnnuncio) {
+                    if ("inviata".equalsIgnoreCase(o.getStato())) {
+                        offerteRicevute++;
+                    }
+                }
+            }
+            if (offerteRicevute > 0)
+                notif.add("Hai " + offerteRicevute + " offerte ricevute da accettare.");
+
+            int annunciScaduti = 0;
+            for (Annuncio a : mieiAnnunci) {
+                if ("scaduto".equalsIgnoreCase(a.getStato())) {
+                    annunciScaduti++;
+                }
+            }
+            if (annunciScaduti > 0)
+                notif.add("Hai " + annunciScaduti + " annunci scaduti.");
+
+        } catch (Exception e) {
+            notif.add("Errore nel caricamento notifiche.");
+        }
+        return notif;
+    }
 
     // =========================================================
     // == UTILITY INTERNE

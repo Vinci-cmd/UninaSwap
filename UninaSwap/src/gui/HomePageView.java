@@ -182,12 +182,18 @@ public class HomePageView {
         } catch (Exception e) {
             notifList.getItems().add("Errore nel caricamento notifiche.");
         }
+        
+        
         notifList.setStyle(
-            "-fx-background-color: transparent;" +
-            "-fx-control-inner-background: rgba(255,255,255,0.04);" +
-            "-fx-background-insets: 0;" +
-            "-fx-text-fill: #EAF0FF;"
-        );
+        	    "-fx-background-color: transparent;" +
+        	    "-fx-control-inner-background: #24273A;" + // sfondo più scuro
+        	    "-fx-background-insets: 0;" +
+        	    "-fx-text-fill: #f8f8fc;" +
+        	    "-fx-font-size: 14px;" + 
+        	    "-fx-font-weight: 500;"
+        	);
+
+
 
         VBox notifCard = card(
                 title("Notifiche recenti"),

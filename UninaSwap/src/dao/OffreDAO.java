@@ -6,7 +6,7 @@ import java.util.List;
 import model.Offre;
 
 public class OffreDAO {
-    private Connection conn;
+    private final Connection conn;
 
     public OffreDAO(Connection conn) {
         this.conn = conn;
@@ -14,10 +14,15 @@ public class OffreDAO {
 
     // Crea un'associazione offerta-oggetto
     public boolean creaOffre(Offre offre) throws SQLException {
+        return aggiungiOggettoAScambio(offre.getCodiceOfferta(), offre.getCodiceOggetto());
+    }
+
+    // Associa un oggetto a un'offerta di tipo scambio
+    public boolean aggiungiOggettoAScambio(String codiceOfferta, String codiceOggetto) throws SQLException {
         String sql = "INSERT INTO offre (codiceofferta, codiceoggetto) VALUES (?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, offre.getCodiceOfferta());
-            ps.setString(2, offre.getCodiceOggetto());
+            ps.setString(1, codiceOfferta);
+            ps.setString(2, codiceOggetto);
             return ps.executeUpdate() == 1;
         }
     }
@@ -28,12 +33,13 @@ public class OffreDAO {
         String sql = "SELECT * FROM offre WHERE codiceofferta = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, codiceOfferta);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                lista.add(new Offre(
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(new Offre(
                         rs.getString("codiceofferta"),
                         rs.getString("codiceoggetto")
-                ));
+                    ));
+                }
             }
         }
         return lista;
@@ -48,14 +54,4 @@ public class OffreDAO {
             return ps.executeUpdate() == 1;
         }
     }
-
-
-//Associa un oggetto a un'offerta di tipo scambio
-public boolean aggiungiOggettoAScambio(String codiceOfferta, String codiceOggetto) throws SQLException {
- String sql = "INSERT INTO offre (codiceofferta, codiceoggetto) VALUES (?, ?)";
- try (PreparedStatement ps = conn.prepareStatement(sql)) {
-     ps.setString(1, codiceOfferta);
-     ps.setString(2, codiceOggetto);
-     return ps.executeUpdate() == 1;
- }
-}}
+}

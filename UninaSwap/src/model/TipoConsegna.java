@@ -15,44 +15,18 @@ public class TipoConsegna {
         this.codiceAnnuncio = codiceAnnuncio;
     }
 
-	public String getCodiceConsegna() {
-		return codiceConsegna;
-	}
+    public String getCodiceConsegna() { return codiceConsegna; }
+    public void setCodiceConsegna(String codiceConsegna) { this.codiceConsegna = codiceConsegna; }
 
-	public void setCodiceConsegna(String codiceConsegna) {
-		this.codiceConsegna = codiceConsegna;
-	}
+    public String getSede() { return sede; }
+    public void setSede(String sede) { this.sede = sede; }
 
-	public String getSede() {
-		return sede;
-	}
+    public String getDescrizione() { return descrizione; }
+    public void setDescrizione(String descrizione) { this.descrizione = descrizione; }
 
-	public void setSede(String sede) {
-		this.sede = sede;
-	}
+    public String getFasciaOraria() { return fasciaOraria; }
+    public void setFasciaOraria(String fasciaOraria) { this.fasciaOraria = fasciaOraria; }
 
-	public String getDescrizione() {
-		return descrizione;
-	}
-
-	public void setDescrizione(String descrizione) {
-		this.descrizione = descrizione;
-	}
-
-	public String getFasciaOraria() {
-		return fasciaOraria;
-	}
-
-	public void setFasciaOraria(String fasciaOraria) {
-		this.fasciaOraria = fasciaOraria;
-	}
-
-	public String getCodiceAnnuncio() {
-		return codiceAnnuncio;
-	}
-
-	public void setCodiceAnnuncio(String codiceAnnuncio) {
-		this.codiceAnnuncio = codiceAnnuncio;
-	}
-
+    public String getCodiceAnnuncio() { return codiceAnnuncio; }
+    public void setCodiceAnnuncio(String codiceAnnuncio) { this.codiceAnnuncio = codiceAnnuncio; }
 }

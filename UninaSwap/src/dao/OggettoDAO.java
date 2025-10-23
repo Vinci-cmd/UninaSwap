@@ -6,12 +6,13 @@ import java.util.List;
 import model.Oggetto;
 
 public class OggettoDAO {
-    private Connection conn;
+    private final Connection conn;
 
     public OggettoDAO(Connection conn) {
         this.conn = conn;
     }
 
+    // Crea nuovo oggetto
     public boolean creaOggetto(Oggetto oggetto, String matricola) throws SQLException {
         String last = getLastCodiceOggetto();
         String prefix = "O";
@@ -39,6 +40,7 @@ public class OggettoDAO {
         }
     }
 
+    // Aggiorna il codice ANnuncio di un oggetto
     public void aggiornaCodiceAnnuncioOggetto(String codiceOggetto, String codiceAnnuncio) throws SQLException {
         String sql = "UPDATE oggetto SET codiceannuncio = ? WHERE codiceoggetto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -47,6 +49,8 @@ public class OggettoDAO {
             ps.executeUpdate();
         }
     }
+
+    // Modifica l'oggetto
     public boolean modificaOggetto(Oggetto oggetto) throws SQLException {
         String sql = "UPDATE oggetto SET nome = ?, descrizione = ?, categoria = ? WHERE codiceoggetto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -54,70 +58,55 @@ public class OggettoDAO {
             ps.setString(2, oggetto.getDescrizione());
             ps.setString(3, oggetto.getCategoria());
             ps.setString(4, oggetto.getCodiceOggetto());
-            int rows = ps.executeUpdate();
-            return rows == 1;
+            return ps.executeUpdate() == 1;
         }
     }
-    // RECUPERA OGGETTO PER CODICE
+
+    // Ricava tutti gli oggetti dal codice
     public Oggetto getOggettoByCodice(String codiceOggetto) throws SQLException {
         String sql = "SELECT * FROM oggetto WHERE codiceoggetto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, codiceOggetto);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                return new Oggetto(
-                    rs.getString("codiceoggetto"),
-                    rs.getString("nome"),
-                    rs.getString("descrizione"),
-                    rs.getString("categoria"),
-                    rs.getString("codiceannuncio")
-                );
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return extractOggetto(rs);
+                }
             }
         }
         return null;
     }
 
-    // RECUPERA TUTTI GLI OGGETTI DI UN ANNUNCIO
+    // Ricava tutti gli oggetti collegati ad un annuncio
     public List<Oggetto> getOggettiByAnnuncio(String codiceAnnuncio) throws SQLException {
         String sql = "SELECT * FROM oggetto WHERE codiceannuncio = ?";
         List<Oggetto> oggetti = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, codiceAnnuncio);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                oggetti.add(new Oggetto(
-                    rs.getString("codiceoggetto"),
-                    rs.getString("nome"),
-                    rs.getString("descrizione"),
-                    rs.getString("categoria"),
-                    rs.getString("codiceannuncio")
-                ));
-            }
-        }
-        return oggetti;
-    }
-    
-    // RECUPERA TUTTI GLI OGGETTI DI UNA AMTRICOLA
-    public List<Oggetto> getOggettiByMatricola(String matricola) throws SQLException {
-        String sql = "SELECT * FROM oggetto WHERE matricola = ?";
-        List<Oggetto> oggetti = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, matricola);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                oggetti.add(new Oggetto(
-                    rs.getString("codiceoggetto"),
-                    rs.getString("nome"),
-                    rs.getString("descrizione"),
-                    rs.getString("categoria"),
-                    rs.getString("codiceannuncio")
-                ));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    oggetti.add(extractOggetto(rs));
+                }
             }
         }
         return oggetti;
     }
 
-    // AGGIORNA OGGETTO
+    // Ricava tutti gli oggetti collegati ad una matricola
+    public List<Oggetto> getOggettiByMatricola(String matricola) throws SQLException {
+        String sql = "SELECT * FROM oggetto WHERE matricola = ?";
+        List<Oggetto> oggetti = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, matricola);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    oggetti.add(extractOggetto(rs));
+                }
+            }
+        }
+        return oggetti;
+    }
+
+    // Aggiorna un oggetto
     public boolean aggiornaOggetto(Oggetto oggetto) throws SQLException {
         String sql = "UPDATE oggetto SET nome = ?, descrizione = ?, categoria = ?, codiceannuncio = ? WHERE codiceoggetto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -130,7 +119,7 @@ public class OggettoDAO {
         }
     }
 
-    // ELIMINA OGGETTO
+    // Metodo che elimina un oggetto
     public boolean eliminaOggetto(String codiceOggetto) throws SQLException {
         String sql = "DELETE FROM oggetto WHERE codiceoggetto = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -138,7 +127,8 @@ public class OggettoDAO {
             return ps.executeUpdate() == 1;
         }
     }
-    
+
+    // recupera l'ultimo codice oggetto
     public String getLastCodiceOggetto() throws SQLException {
         String sql = "SELECT MAX(codiceoggetto) AS maxcode FROM oggetto WHERE codiceoggetto LIKE 'O%'";
         try (PreparedStatement ps = conn.prepareStatement(sql);
@@ -148,5 +138,16 @@ public class OggettoDAO {
             }
         }
         return null;
+    }
+
+    // Metodo per evitare duplicazione codice (senza dover scrivere sempre rs.getstring e.c.c)
+    private Oggetto extractOggetto(ResultSet rs) throws SQLException {
+        return new Oggetto(
+            rs.getString("codiceoggetto"),
+            rs.getString("nome"),
+            rs.getString("descrizione"),
+            rs.getString("categoria"),
+            rs.getString("codiceannuncio")
+        );
     }
 }

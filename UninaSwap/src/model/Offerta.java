@@ -13,7 +13,7 @@ public class Offerta {
     private String messaggio;
     private String descrizioneAnnuncio;
 
-    // Costruttore completo
+    // Costruttore 
     public Offerta(String codiceOfferta, String codiceAnnuncio, String matricola, String tipo,
                    Double prezzoOfferto, String stato, Date data) {
         this.codiceOfferta = codiceOfferta;
@@ -24,73 +24,35 @@ public class Offerta {
         this.stato = stato;
         this.data = data;
     }
-
-    // Costruttore vuoto
+    // Costruttore Vuoto
     public Offerta() {}
+    // Getter & Setter
+    public String getCodiceOfferta() { return codiceOfferta; }
+    public void setCodiceOfferta(String codiceOfferta) { this.codiceOfferta = codiceOfferta; }
 
-    // Getters e Setters
-    public String getCodiceOfferta() {
-        return codiceOfferta;
-    }
-    public void setCodiceOfferta(String codiceOfferta) {
-        this.codiceOfferta = codiceOfferta;
-    }
+    public String getCodiceAnnuncio() { return codiceAnnuncio; }
+    public void setCodiceAnnuncio(String codiceAnnuncio) { this.codiceAnnuncio = codiceAnnuncio; }
 
-    public String getCodiceAnnuncio() {
-        return codiceAnnuncio;
-    }
-    public void setCodiceAnnuncio(String codiceAnnuncio) {
-        this.codiceAnnuncio = codiceAnnuncio;
-    }
+    public String getMatricola() { return matricola; }
+    public void setMatricola(String matricola) { this.matricola = matricola; }
 
-    public String getMatricola() {
-        return matricola;
-    }
-    public void setMatricola(String matricola) {
-        this.matricola = matricola;
-    }
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
 
-    public String getTipo() {
-        return tipo;
-    }
-    public void setTipo(String tipo) {
-        this.tipo = tipo;
-    }
+    public Double getPrezzoOfferto() { return prezzoOfferto; }
+    public void setPrezzoOfferto(Double prezzoOfferto) { this.prezzoOfferto = prezzoOfferto; }
 
-    public Double getPrezzoOfferto() {
-        return prezzoOfferto;
-    }
-    public void setPrezzoOfferto(Double prezzoOfferto) {
-        this.prezzoOfferto = prezzoOfferto;
-    }
+    public String getStato() { return stato; }
+    public void setStato(String stato) { this.stato = stato; }
 
-    public String getStato() {
-        return stato;
-    }
-    public void setStato(String stato) {
-        this.stato = stato;
-    }
+    public Date getData() { return data; }
+    public void setData(Date data) { this.data = data; }   // <--- correzione qui
 
-    public Date getData() {
-        return data;
-    }
-    public void setdata(Date data) {
-        this.data = data;
-    }
+    public String getMessaggio() { return messaggio; }
+    public void setMessaggio(String messaggio) { this.messaggio = messaggio; }
 
-    public String getMessaggio() {
-        return messaggio;
-    }
-    public void setMessaggio(String messaggio) {
-        this.messaggio = messaggio;
-    }
-
-    public String getDescrizioneAnnuncio() {
-        return descrizioneAnnuncio;
-    }
-    public void setDescrizioneAnnuncio(String descrizioneAnnuncio) {
-        this.descrizioneAnnuncio = descrizioneAnnuncio;
-    }
+    public String getDescrizioneAnnuncio() { return descrizioneAnnuncio; }
+    public void setDescrizioneAnnuncio(String descrizioneAnnuncio) { this.descrizioneAnnuncio = descrizioneAnnuncio; }
 
     @Override
     public String toString() {

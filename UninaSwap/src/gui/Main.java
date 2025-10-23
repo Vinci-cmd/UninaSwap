@@ -4,7 +4,6 @@ import Controller.Controller;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import service.Service;
 import utils.DatabaseConnection;
 
 import java.sql.Connection;
@@ -15,8 +14,8 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         try {
             Connection conn = DatabaseConnection.getConnection();
-            Service service = new Service(conn);
-            Controller controller = new Controller(service);
+            Controller controller = new Controller(conn);
+
 
             // Partenza dalla schermata di login!
             LoginView loginView = new LoginView(primaryStage, controller);

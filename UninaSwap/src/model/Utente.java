@@ -1,5 +1,7 @@
 package model;
 
+import java.util.Objects;
+
 public class Utente {
     private String matricola;
     private String nome;
@@ -8,6 +10,7 @@ public class Utente {
     private String password;
     private String universita;
 
+    // Costruttore
     public Utente(String matricola, String nome, String cognome, String email, String password, String universita) {
         this.matricola = matricola;
         this.nome = nome;
@@ -17,53 +20,37 @@ public class Utente {
         this.universita = universita;
     }
 
-	public String getMatricola() {
-		return matricola;
-	}
+    // Getter & Setter
+    public String getMatricola() { return matricola; }
+    public void setMatricola(String matricola) { this.matricola = matricola; }
 
-	public void setMatricola(String matricola) {
-		this.matricola = matricola;
-	}
+    public String getNome() { return nome; }
+    public void setNome(String nome) { this.nome = nome; }
 
-	public String getNome() {
-		return nome;
-	}
+    public String getCognome() { return cognome; }
+    public void setCognome(String cognome) { this.cognome = cognome; }
 
-	public void setNome(String nome) {
-		this.nome = nome;
-	}
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-	public String getCognome() {
-		return cognome;
-	}
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
 
-	public void setCognome(String cognome) {
-		this.cognome = cognome;
-	}
+    public String getUniversita() { return universita; }
+    public void setUniversita(String universita) { this.universita = universita; }
 
-	public String getEmail() {
-		return email;
-	}
+    // Metodi utility: equals e toString
+    
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Utente)) return false;
+        Utente utente = (Utente) o;
+        return Objects.equals(matricola, utente.matricola);
+    }
 
-	public void setEmail(String email) {
-		this.email = email;
-	}
-
-	public String getPassword() {
-		return password;
-	}
-
-	public void setPassword(String password) {
-		this.password = password;
-	}
-
-	public String getUniversita() {
-		return universita;
-	}
-
-	public void setUniversita(String universita) {
-		this.universita = universita;
-	}
-
-
+    @Override
+    public String toString() {
+        return nome + " " + cognome + " (" + matricola + ")";
+    }
 }
