@@ -33,19 +33,16 @@ public class OfferteRicevuteView {
     private VBox root;
     private final Controller controller;
 
-    // Dati
     private final ObservableList<Offerta> masterData = FXCollections.observableArrayList();
     private FilteredList<Offerta> filtered;
     private SortedList<Offerta> sorted;
 
-    // UI
     private TableView<Offerta> tableOfferte;
     private ComboBox<String> cbTipologia;
     private ComboBox<String> cbStato;
     private TextField tfSearch;
     private Label emptyLabel;
 
-    // Filtri
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(200));
 
     public OfferteRicevuteView(Controller controller) {
@@ -54,7 +51,6 @@ public class OfferteRicevuteView {
         reloadData();
     }
 
-    // ============================== UI ==============================
     private void createUI() {
         root = new VBox(16);
         root.setPadding(new Insets(16));
@@ -233,7 +229,6 @@ public class OfferteRicevuteView {
         root.getChildren().addAll(header, filtersCard, tableCard);
     }
     
-    // ============================== DATA ==============================
     private void reloadData() {
         try {
             String matricola = controller.getUtenteCorrente().getMatricola();
@@ -280,7 +275,6 @@ public class OfferteRicevuteView {
         }
     }
 
-    // ============================== ACTIONS ==============================
     private void gestisciAccetta(Offerta offerta) {
         Alert conferma = new Alert(Alert.AlertType.CONFIRMATION, "Accettare questa offerta? Le altre per lo stesso annuncio verranno rifiutate!", ButtonType.YES, ButtonType.NO);
         conferma.setHeaderText("Accetta Offerta");
@@ -372,7 +366,6 @@ public class OfferteRicevuteView {
         dialog.showAndWait();
     }
 
-    // ============================== Helpers UI ==============================
     private VBox card() {
         VBox card = new VBox();
         card.setPadding(new Insets(16));

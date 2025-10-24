@@ -16,7 +16,6 @@ public class LoginView {
     private final Controller controller;
     private final Stage stage;
 
-    // --- LOGIN ---
     private TextField emailField;
     private PasswordField passwordField;
     private TextField passwordMirror;
@@ -25,7 +24,6 @@ public class LoginView {
     private Label loginMessageLabel;
     private Hyperlink goToRegisterLink;
 
-    // --- REGISTRAZIONE ---
     private TextField nomeField;
     private TextField cognomeField;
     private TextField matricolaField;
@@ -55,7 +53,6 @@ public class LoginView {
         );
     }
 
-    // =============== LOGIN VIEW ===============
     private void showLoginView() {
         root.getChildren().clear();
 
@@ -152,7 +149,6 @@ public class LoginView {
         VBox.setVgrow(centerWrap, Priority.ALWAYS);
     }
 
-    // =============== REGISTER VIEW ===============
     private void showRegisterView() {
         root.getChildren().clear();
 
@@ -234,7 +230,6 @@ public class LoginView {
         VBox.setVgrow(centerWrap, Priority.ALWAYS);
     }
 
-    // =============== HANDLERS ===============
     private void tryLogin() {
         String email = safeTrim(emailField.getText());
         String password = showPass.isSelected()
@@ -401,7 +396,6 @@ public class LoginView {
         return r;
     }
 
-    // =============== UTILS ===============
     private static String safeTrim(String s) {
         return s == null ? "" : s.trim();
     }

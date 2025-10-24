@@ -32,12 +32,10 @@ public class ListaAnnunciView {
     private VBox root;
     private final Controller controller;
 
-    // Dati
     private final ObservableList<Annuncio> masterData = FXCollections.observableArrayList();
     private FilteredList<Annuncio> filtered;
     private SortedList<Annuncio> sorted;
 
-    // UI
     private TableView<Annuncio> tableAnnunci;
     private ComboBox<String> cbCategoria;
     private ComboBox<String> cbTipologia;
@@ -45,7 +43,6 @@ public class ListaAnnunciView {
     private TextField txtSearch;
     private Label emptyLabel;
 
-    // Filtri
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(200));
     private List<String> categorie;
 
@@ -55,7 +52,6 @@ public class ListaAnnunciView {
         reloadData();
     }
 
-    // ============================== UI ==============================
     private void createUI() {
         root = new VBox(16);
         root.setPadding(new Insets(16));
@@ -227,7 +223,6 @@ public class ListaAnnunciView {
         root.getChildren().addAll(header, filtersCard, tableCard);
     }
 
-    // ============================== DATA ==============================
     private void reloadData() {
         try {
             String matricolaUtente = controller.getUtenteCorrente().getMatricola();
@@ -295,7 +290,6 @@ public class ListaAnnunciView {
         emptyLabel.setManaged(filtered.isEmpty());
     }
 
-    // ============================== DIALOG ==============================
     private void mostraDettaglioAnnuncio(Annuncio annuncio) {
         Stage dialog = new Stage();
         dialog.initModality(Modality.APPLICATION_MODAL);
@@ -531,7 +525,6 @@ public class ListaAnnunciView {
     }
 
 
-    // ============================== Helpers UI ==============================
     private TextArea styledTextArea() {
         TextArea ta = new TextArea();
         ta.setWrapText(true);

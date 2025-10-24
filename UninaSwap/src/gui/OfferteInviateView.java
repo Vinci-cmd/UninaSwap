@@ -32,19 +32,16 @@ public class OfferteInviateView {
     private VBox root;
     private final Controller controller;
 
-    // Dati
     private final ObservableList<Offerta> masterData = FXCollections.observableArrayList();
     private FilteredList<Offerta> filtered;
     private SortedList<Offerta> sorted;
 
-    // UI
     private TableView<Offerta> tableOfferte;
     private ComboBox<String> cbTipologia;
     private ComboBox<String> cbStato;
     private TextField tfSearch;
     private Label emptyLabel;
 
-    // Filtri
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(200));
 
     public OfferteInviateView(Controller controller) {
@@ -53,7 +50,6 @@ public class OfferteInviateView {
         reloadData();
     }
 
-    // ============================== UI ==============================
     private void createUI() {
         root = new VBox(16);
         root.setPadding(new Insets(16));
@@ -195,7 +191,6 @@ public class OfferteInviateView {
         root.getChildren().addAll(header, filtersCard, tableCard);
     }
 
-    // ============================== DATA ==============================
     private void reloadData() {
         try {
             String matricola = controller.getUtenteCorrente().getMatricola();
@@ -231,7 +226,6 @@ public class OfferteInviateView {
         emptyLabel.setManaged(filtered.isEmpty());
     }
     
-    // ============================== ACTIONS ==============================
     private void annullaOfferta(Offerta offerta) {
         if (!"inviata".equals(offerta.getStato())) {
             warn("Puoi annullare solo offerte in stato 'inviata'.");
@@ -316,7 +310,6 @@ public class OfferteInviateView {
         dialog.showAndWait();
     }
 
-    // ============================== Helpers UI ==============================
     private VBox card() {
         VBox card = new VBox();
         card.setPadding(new Insets(16));

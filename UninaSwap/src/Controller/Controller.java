@@ -807,7 +807,9 @@ public boolean compraSubito(String codiceAnnuncio) throws SQLException {
                     }
                  }
             }
-            if (offerteRicevute > 0)
+            if(offerteRicevute == 1)
+            	notif.add("Hai" + offerteRicevute + " offerta ricevuta da valutare");
+            if (offerteRicevute > 1)
                 notif.add("Hai " + offerteRicevute + " offerte ricevute da valutare.");
 
             int annunciScaduti = 0;
@@ -816,7 +818,9 @@ public boolean compraSubito(String codiceAnnuncio) throws SQLException {
                     annunciScaduti++;
                 }
             }
-            if (annunciScaduti > 0)
+            if (annunciScaduti == 1)
+                notif.add("Hai " + annunciScaduti + " annuncio scaduto.");
+            if (annunciScaduti > 1)
                 notif.add("Hai " + annunciScaduti + " annunci scaduti.");
 
         } catch (Exception e) {
